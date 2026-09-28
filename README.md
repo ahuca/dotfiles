@@ -93,7 +93,7 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 | `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); opt-in `< > \|` on the key left of 1 (`xkb_lsgt_on_tlde`) |
 | `ghostty`  | Ghostty config (`roles/ghostty/files/config.ghostty`, Windows Terminal-style keys) |
 | `shell`    | zsh + oh-my-zsh (plugins: git, z), login shell, Bitwarden SSH-agent socket   |
-| `git`      | SSH commit/tag signing with the Bitwarden agent key matching `user.email`, allowed signers file; per-remote `user.email` profiles (`git_profiles`) with matching `~/.ssh/config` hosts |
+| `git`      | SSH commit/tag signing with the Bitwarden agent key matching `user.email` (looked up per commit), allowed signers file; per-remote `user.email` profiles (`git_profiles`) with matching `~/.ssh/config` hosts |
 | `nodejs`   | nvm + latest LTS node, set as the default                                     |
 | `homebrew` | Linuxbrew + `opencode` (which pulls in ripgrep)                               |
 

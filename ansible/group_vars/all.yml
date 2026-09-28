@@ -135,15 +135,16 @@ bitwarden_ssh_agent_enabled: true
 bitwarden_ssh_agent_sock: "$HOME/snap/bitwarden/current/.bitwarden-ssh-agent.sock"
 
 # ── git ─────────────────────────────────────────────────────────────
-# Commit/tag signing with SSH keys held in the Bitwarden agent.
+# Commit/tag signing with SSH keys held in the Bitwarden agent: each commit
+# is signed with the agent key whose comment is the repo's user.email, looked
+# up at commit time (gpg.ssh.defaultKeyCommand), so no key is stored.
 git_signing_enabled: true
-# Not stored in the repo: taken from $GIT_SIGNING_EMAIL / $GIT_SIGNING_KEY,
-# else git's user.email and the agent key whose comment matches it
-# (`ssh-add -L`). Neither found => role skipped.
+# Not stored in the repo: taken from $GIT_SIGNING_EMAIL, else git's
+# user.email. No agent key for it => signing skipped.
 git_signing_email: "{{ lookup('env', 'GIT_SIGNING_EMAIL') }}"
-git_signing_key: "{{ lookup('env', 'GIT_SIGNING_KEY') }}"
 git_config_dir: "{{ target_home }}/.config/git"
 git_allowed_signers_file: "{{ git_config_dir }}/allowed_signers"
+git_signing_key_command: "{{ git_config_dir }}/signing-key"
 
 # Per-remote identity via includeIf "hasconfig:remote.*.url:...": a repo whose
 # remote is git@<host>:... gets that profile's user.email and the agent key

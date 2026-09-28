@@ -1,6 +1,8 @@
 ---
 # Signs with the public key only: ssh-keygen finds the private half in the
-# Bitwarden SSH agent, so the vault must be unlocked to commit.
+# Bitwarden SSH agent, so the vault must be unlocked to commit. Which key is
+# picked at commit time from user.email (files/signing-key), so no key is
+# stored in git's config.
 # Emails, hosts and keys come from the environment or this machine, never the repo.
 - name: Read git's user.email
   ansible.builtin.command: git config --global user.email
@@ -10,16 +12,14 @@
   check_mode: false
   when: git_signing_email | length == 0
 
-# Kept while the agent is locked, as are the profiles' keys.
-- name: Read git's user.signingkey
-  ansible.builtin.command: git config --global user.signingkey
-  register: _git_user_signingkey
-  changed_when: false
-  failed_when: false
-  check_mode: false
-  when: git_signing_enabled | bool
+# The keys a previous run found, as "<email> <type> <key>" lines, for when the
+# agent is locked.
+- name: Read the allowed signers written by a previous run
+  ansible.builtin.set_fact:
+    _known_signers: >-
+      {{ (query('ansible.builtin.file', git_allowed_signers_file, errors='ignore')
+          | first | default('')).splitlines() | reject('match', '#') | list }}
 
-# Also needed for the profiles' keys, so read even when GIT_SIGNING_KEY is set.
 # Every key lives in Bitwarden; nothing is read from ~/.ssh.
 - name: List the keys in the Bitwarden SSH agent
   ansible.builtin.command: ssh-add -L
@@ -35,11 +35,11 @@
   ansible.builtin.set_fact:
     _signing_email: "{{ _email }}"
     _signing_key: >-
-      {{ git_signing_key if git_signing_key | length > 0 else
-         ((_agent_keys.stdout_lines | default([])
+      {{ ((_agent_keys.stdout_lines | default([])
            | select('match', '.* ' ~ (_email | regex_escape) ~ '$')
            | first | default('')).split(' ')[:2] | join(' '))
-         or (_git_user_signingkey.stdout | default('') | regex_replace('^key::', '')) }}
+         or (_known_signers | select('match', (_email | regex_escape) ~ ' ')
+             | map('regex_replace', '^[^ ]+ ', '') | first | default('')) }}
   vars:
     _email: "{{ git_signing_email if git_signing_email | length > 0 else (_git_user_email.stdout | default('')) }}"
   when: git_signing_enabled | bool
@@ -98,15 +98,19 @@
         - { name: gpg.ssh.allowedSignersFile, value: "{{ git_allowed_signers_file }}" }
         - { name: commit.gpgsign, value: "true" }
         - { name: tag.gpgsign, value: "true" }
+        - { name: gpg.ssh.defaultKeyCommand, value: "{{ git_signing_key_command }}" }
       loop_control:
         label: "{{ item.name }}"
 
-    # The profiles override this for their own remotes.
-    - name: Sign with the Bitwarden key matching the global user.email
+    - name: Install the signing key lookup
+      ansible.builtin.copy:
+        src: signing-key
+        dest: "{{ git_signing_key_command }}"
+        mode: "0755"
+
+    # Set, it would win over the lookup for every repo, profiles included.
+    - name: Drop the stored signing key
       community.general.git_config:
         scope: global
         name: user.signingkey
-        value: "key::{{ _signing_key }}"
-      when:
-        - _signing_email | length > 0
-        - _signing_key | length > 0
+        state: absent

@@ -1,0 +1,7 @@
+#!/bin/sh
+# gpg.ssh.defaultKeyCommand: the agent key whose comment is this repo's
+# user.email, so each profile signs with its own key without storing it.
+email=$(git config user.email) || { echo "user.email is not set" >&2; exit 1; }
+key=$(ssh-add -L | awk -v e="$email" '$NF == e { print $1, $2; exit }')
+[ -n "$key" ] || { echo "no key for $email in the SSH agent" >&2; exit 1; }
+echo "key::$key"

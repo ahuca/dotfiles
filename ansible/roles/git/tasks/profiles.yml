@@ -1,10 +1,10 @@
 ---
 # Per-remote identities. A repo whose remote is git@<host>:... (or
 # ssh://git@<host>/...), narrowed to git@<host>:<owner>/... when the profile
-# has an owner, includes that profile's file, which sets user.email and the
-# agent key matching it; other repos keep the global identity. ssh offers that
-# same key for the host (or, with an owner, for that profile's repos), so the
-# matching account authenticates.
+# has an owner, includes that profile's file, which sets user.email; commits
+# are signed with the agent key matching it. Other repos keep the global
+# identity. ssh offers that same key for the host (or, with an owner, for that
+# profile's repos), so the matching account authenticates.
 # Host, owner and email come from the environment, else from the files a
 # previous run wrote, so they are only needed once per machine.
 - name: Read the git profiles written by a previous run
@@ -15,7 +15,7 @@
       - --file
       - "{{ git_config_dir }}/{{ item.name }}.gitconfig"
       - --get-regexp
-      - ^user[.](email|signingkey)$
+      - ^user[.]email$
   loop: "{{ git_profiles }}"
   loop_control:
     label: "{{ item.name }}"
@@ -66,14 +66,14 @@
       {{ item.0.owner or (_routes | map('regex_replace', '^[^:]+:', '')
          | map('regex_replace', '/[*][*][.]path .*$', '') | map('regex_replace', '^[*][*]$', '')
          | first | default('')) }}
-    # The agent key whose comment is the email; the one written last time
+    # The agent key whose comment is the email; the one a previous run found
     # while the vault is locked.
     _key: >-
       {{ ((_agent_keys.stdout_lines | default([])
            | select('match', '.* ' ~ (_email | regex_escape) ~ '$')
            | first | default('')).split(' ')[:2] | join(' '))
-         or (_old | select('match', '^user[.]signingkey key::')
-             | map('regex_replace', '^user[.]signingkey key::', '') | first | default(''))
+         or (_known_signers | select('match', (_email | regex_escape) ~ ' ')
+             | map('regex_replace', '^[^ ]+ ', '') | first | default(''))
          or ((query('ansible.builtin.file', git_ssh_key_dir ~ '/' ~ item.0.name ~ '.pub', errors='ignore')
               | first | default('')).split(' ')[:2] | join(' ')) }}
 
@@ -95,8 +95,7 @@
   ansible.builtin.debug:
     msg: >-
       Git profile '{{ item.name }}' has no key in the Bitwarden agent, so its
-      commits are signed with the global key and ssh has no route for its
-      host. Unlock Bitwarden with an SSH key whose comment is that profile's
+      commits can't be signed and ssh has no route for its host. Unlock Bitwarden with an SSH key whose comment is that profile's
       email, then re-run.
   loop: "{{ _git_active | rejectattr('key') }}"
   loop_control:
