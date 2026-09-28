@@ -149,14 +149,15 @@ group is root-equivalent, and ports you publish with `-p` bypass ufw.
 - Bitwarden: **Settings → Enable SSH agent**, unlock the vault, add SSH-key
   items. The socket only exists once the agent is on; `ssh-add -l` then lists
   your keys.
-- Git profiles: a repo takes its `user.email` (and signing key) from the SSH
-  host its remote points at — `git@github.com:…` for personal, an
-  `~/.ssh/config` alias such as `git@<work-alias>:…` for work. Neither the
-  emails nor the alias are in this repo; give them once and later runs read
-  them back from `~/.config/git/<profile>.gitconfig`:
+- Git profiles: a repo takes its `user.email` (and signing key) from its
+  remote URL — `git@github.com:…` for personal, and for work either the
+  org on the same host (`git@github.com:<org>/…`, via `GIT_WORK_OWNER`) or
+  an `~/.ssh/config` alias such as `git@<work-alias>:…`. Neither the emails,
+  the org nor the alias are in this repo; give them once and later runs read
+  them back from `~/.config/git/`:
 
   ```bash
-  GIT_PERSONAL_EMAIL=… GIT_WORK_HOST=… GIT_WORK_EMAIL=… \
+  GIT_PERSONAL_EMAIL=… GIT_WORK_HOST=github.com GIT_WORK_OWNER=… GIT_WORK_EMAIL=… \
     ansible-playbook site.yml --tags git
   ```
 
@@ -165,8 +166,10 @@ group is root-equivalent, and ports you publish with `-p` bypass ufw.
   live in Bitwarden: the role writes only their public halves, to
   `~/.ssh/bitwarden/<profile>.pub`, which the managed block at the top of
   `~/.ssh/config` points `IdentityFile` at (ssh has no other way to pick one
-  agent key per host). `git config user.email` inside a repo shows which
-  profile it got.
+  agent key per host). An owner-scoped profile shares its host, so its
+  `core.sshCommand` skips `~/.ssh/config` and offers only its key. The owner
+  match is case-sensitive, like git's globs. `git config user.email` inside a
+  repo shows which profile it got.
 
 ## `tpm-unlock.yml` — LUKS auto-unlock via TPM2
 

@@ -148,18 +148,22 @@ git_allowed_signers_file: "{{ git_config_dir }}/allowed_signers"
 # Per-remote identity via includeIf "hasconfig:remote.*.url:...": a repo whose
 # remote is git@<host>:... gets that profile's user.email and the agent key
 # whose comment matches it. Other repos keep the global user.email.
-# Not stored in the repo: host/email come from $GIT_<NAME>_HOST /
-# $GIT_<NAME>_EMAIL, else from the files a previous run wrote. A profile
-# missing either is skipped. host is an SSH Host alias for a second account
-# on the same forge (hostname), or the forge itself.
+# Not stored in the repo: host/owner/email come from $GIT_<NAME>_HOST /
+# $GIT_<NAME>_OWNER / $GIT_<NAME>_EMAIL, else from the files a previous run
+# wrote. A profile missing host or email is skipped. host is the forge itself,
+# or an SSH Host alias for a second account on it (hostname). owner, if set,
+# narrows the profile to git@<host>:<owner>/... (a user or org) and wins over
+# a profile for the whole host, so no alias is needed.
 git_profiles_enabled: true
 git_profiles:
   - name: personal
     host: "{{ lookup('env', 'GIT_PERSONAL_HOST', default='github.com') }}"
+    owner: "{{ lookup('env', 'GIT_PERSONAL_OWNER') }}"
     hostname: github.com
     email: "{{ lookup('env', 'GIT_PERSONAL_EMAIL') }}"
   - name: work
     host: "{{ lookup('env', 'GIT_WORK_HOST') }}"
+    owner: "{{ lookup('env', 'GIT_WORK_OWNER') }}"
     hostname: github.com
     email: "{{ lookup('env', 'GIT_WORK_EMAIL') }}"
 git_profiles_file: "{{ git_config_dir }}/profiles.gitconfig"

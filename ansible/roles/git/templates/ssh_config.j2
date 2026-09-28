@@ -1,6 +1,7 @@
 # Each host offers only its profile's Bitwarden key, so the right account
-# authenticates even when several share one HostName.
-{% for profile in _git_active | selectattr('key') %}
+# authenticates even when several share one HostName. Owner-scoped profiles
+# pick their key through core.sshCommand instead.
+{% for profile in _git_active | selectattr('key') | rejectattr('owner') %}
 
 Host {{ profile.host }}
     HostName {{ profile.hostname }}

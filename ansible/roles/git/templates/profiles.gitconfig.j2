@@ -1,10 +1,13 @@
 # {{ ansible_managed }}
 # Included from ~/.gitconfig: a repo takes the identity of the SSH host its
-# remote points at. Paths are relative to this file.
-{% for profile in _git_active %}
+# remote points at, or of the owner (user or org) on that host. Owner routes
+# come last: the last include wins, so they beat their host's. Paths are
+# relative to this file.
+{% for profile in (_git_active | rejectattr('owner') | list) + (_git_active | selectattr('owner') | list) %}
+{% set owner = profile.owner ~ '/' if profile.owner else '' %}
 
-[includeIf "hasconfig:remote.*.url:git@{{ profile.host }}:**/**"]
+[includeIf "hasconfig:remote.*.url:git@{{ profile.host }}:{{ owner or '**/' }}**"]
 	path = {{ profile.name }}.gitconfig
-[includeIf "hasconfig:remote.*.url:ssh://git@{{ profile.host }}/**"]
+[includeIf "hasconfig:remote.*.url:ssh://git@{{ profile.host }}/{{ owner }}**"]
 	path = {{ profile.name }}.gitconfig
 {% endfor %}

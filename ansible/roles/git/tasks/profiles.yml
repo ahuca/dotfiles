@@ -1,10 +1,12 @@
 ---
 # Per-remote identities. A repo whose remote is git@<host>:... (or
-# ssh://git@<host>/...) includes that profile's file, which sets user.email and
-# the agent key matching it; other repos keep the global identity. ssh offers
-# that same key for the host, so the matching account authenticates.
-# Host and email come from the environment, else from the files a previous run
-# wrote, so they are only needed once per machine.
+# ssh://git@<host>/...), narrowed to git@<host>:<owner>/... when the profile
+# has an owner, includes that profile's file, which sets user.email and the
+# agent key matching it; other repos keep the global identity. ssh offers that
+# same key for the host (or, with an owner, for that profile's repos), so the
+# matching account authenticates.
+# Host, owner and email come from the environment, else from the files a
+# previous run wrote, so they are only needed once per machine.
 - name: Read the git profiles written by a previous run
   ansible.builtin.command:
     argv:
@@ -43,8 +45,8 @@
 - name: Resolve the git profiles
   ansible.builtin.set_fact:
     _git_profiles: >-
-      {{ _git_profiles + [{'name': item.0.name, 'host': _host, 'hostname': item.0.hostname,
-                           'email': _email, 'key': _key}] }}
+      {{ _git_profiles + [{'name': item.0.name, 'host': _host, 'owner': _owner,
+                           'hostname': item.0.hostname, 'email': _email, 'key': _key}] }}
   loop: "{{ git_profiles | zip(_profile_files.results) | list }}"
   loop_control:
     label: "{{ item.0.name }}"
@@ -53,11 +55,16 @@
     _email: >-
       {{ item.0.email or (_old | select('match', '^user[.]email ')
          | map('regex_replace', '^user[.]email ', '') | first | default('')) }}
-    # includeif.hasconfig:remote.*.url:git@<host>:**/**.path <name>.gitconfig
-    _host: >-
-      {{ item.0.host or (_profile_hosts.stdout_lines | default([])
+    # includeif.hasconfig:remote.*.url:git@<host>:<owner or **>/**.path <name>.gitconfig
+    _routes: >-
+      {{ _profile_hosts.stdout_lines | default([])
          | select('search', 'url:git@[^:]+:.* ' ~ (item.0.name | regex_escape) ~ '[.]gitconfig$')
-         | map('regex_replace', '^.*url:git@', '') | map('regex_replace', ':.*$', '')
+         | map('regex_replace', '^.*url:git@', '') | list }}
+    _host: >-
+      {{ item.0.host or (_routes | map('regex_replace', ':.*$', '') | first | default('')) }}
+    _owner: >-
+      {{ item.0.owner or (_routes | map('regex_replace', '^[^:]+:', '')
+         | map('regex_replace', '/[*][*][.]path .*$', '') | map('regex_replace', '^[*][*]$', '')
          | first | default('')) }}
     # The agent key whose comment is the email; the one written last time
     # while the vault is locked.
