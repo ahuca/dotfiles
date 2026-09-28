@@ -1,0 +1,10 @@
+---
+- name: Install build tools and kernel headers for {{ ansible_facts.kernel }}
+  ansible.builtin.apt:
+    name:
+      - build-essential
+      - "linux-headers-{{ ansible_facts.kernel }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true

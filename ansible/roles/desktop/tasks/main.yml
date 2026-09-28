@@ -1,0 +1,137 @@
+---
+# CopyQ's own global shortcut cannot grab keys under Wayland.
+- name: Bind the CopyQ hotkey through GNOME custom shortcuts
+  when:
+    - copyq_hotkey_enabled | bool
+    - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
+  tags: [copyq, gnome]
+  vars:
+    _ck_root: /org/gnome/settings-daemon/plugins/media-keys/custom-keybindings
+    _ck_path: /org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/copyq/
+  block:
+    - name: Read the existing custom-keybinding list
+      community.general.dconf:
+        key: "{{ _ck_root }}"
+        state: read
+      register: _ck_list
+
+    - name: Register our binding in the list, preserving any others
+      community.general.dconf:
+        key: "{{ _ck_root }}"
+        value: "{{ (_ck_existing + [_ck_path]) | unique | to_json }}"
+        state: present
+      vars:
+        _ck_existing: "{{ _ck_list.value | default('', true) | regex_findall(\"'([^']+)'\") }}"
+      when: _ck_path not in _ck_existing
+
+    - name: Configure the binding
+      community.general.dconf:
+        key: "{{ _ck_path }}{{ item.key }}"
+        value: "'{{ item.value }}'"
+        state: present
+      loop:
+        - { key: name, value: "{{ copyq_hotkey_name }}" }
+        - { key: command, value: "{{ copyq_hotkey_command }}" }
+        - { key: binding, value: "{{ copyq_hotkey_binding }}" }
+      loop_control:
+        label: "{{ item.key }}"
+
+- name: Note the skipped hotkey binding
+  ansible.builtin.debug:
+    msg: No D-Bus session bus — re-run from your desktop session with --tags copyq
+  when:
+    - copyq_hotkey_enabled | bool
+    - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is not defined
+  tags: [copyq, gnome]
+
+- name: Ensure the autostart directory exists
+  ansible.builtin.file:
+    path: "{{ target_home }}/.config/autostart"
+    state: directory
+    mode: "0755"
+  when: copyq_autostart | bool
+  tags: [copyq]
+
+- name: Autostart CopyQ
+  ansible.builtin.copy:
+    dest: "{{ target_home }}/.config/autostart/copyq.desktop"
+    mode: "0644"
+    content: |
+      [Desktop Entry]
+      Type=Application
+      Name=CopyQ
+      Exec=copyq
+      Icon=copyq
+      X-GNOME-Autostart-enabled=true
+      Comment=Clipboard manager
+  when: copyq_autostart | bool
+  tags: [copyq]
+
+- name: Bind the "Always on top" toggle
+  when:
+    - wm_toggle_above_bindings | length > 0
+    - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
+  tags: [keybindings, gnome]
+  block:
+    - name: Read the effective "Always on top" bindings
+      ansible.builtin.command: gsettings get org.gnome.desktop.wm.keybindings toggle-above
+      register: _toggle_above
+      changed_when: false
+
+    - name: Add our bindings, preserving any others
+      community.general.dconf:
+        key: /org/gnome/desktop/wm/keybindings/toggle-above
+        value: "{{ (_existing + wm_toggle_above_bindings) | unique | to_json }}"
+        state: present
+      vars:
+        _existing: "{{ _toggle_above.stdout | regex_findall(\"'([^']+)'\") }}"
+      when: wm_toggle_above_bindings | difference(_existing) | length > 0
+
+- name: Note the skipped "Always on top" bindings
+  ansible.builtin.debug:
+    msg: No D-Bus session bus — re-run from your desktop session with --tags keybindings
+  when:
+    - wm_toggle_above_bindings | length > 0
+    - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is not defined
+  tags: [keybindings, gnome]
+
+- name: Deploy the custom XKB option
+  ansible.builtin.copy:
+    src: xkb/
+    dest: "{{ target_home }}/.config/xkb/"
+    mode: "0644"
+    directory_mode: "0755"
+  when: xkb_lsgt_on_tlde | bool
+  tags: [keyboard, gnome]
+
+- name: Enable the custom XKB option in GNOME
+  when:
+    - xkb_lsgt_on_tlde | bool
+    - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
+  tags: [keyboard, gnome]
+  vars:
+    _xkb_key: /org/gnome/desktop/input-sources/xkb-options
+    _xkb_option: custom:lsgt_on_tlde
+  block:
+    - name: Read the existing XKB options
+      community.general.dconf:
+        key: "{{ _xkb_key }}"
+        state: read
+      register: _xkb_opts
+
+    - name: Add our option, preserving any others
+      community.general.dconf:
+        key: "{{ _xkb_key }}"
+        value: "{{ (_xkb_existing + [_xkb_option]) | unique | to_json }}"
+        state: present
+      vars:
+        _xkb_existing: "{{ _xkb_opts.value | default('', true) | regex_findall(\"'([^']+)'\") }}"
+      when: _xkb_option not in _xkb_existing
+
+- name: Note the skipped XKB option
+  ansible.builtin.debug:
+    msg: No D-Bus session bus — re-run from your desktop session with --tags keyboard
+  when:
+    - xkb_lsgt_on_tlde | bool
+    - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is not defined
+  tags: [keyboard, gnome]

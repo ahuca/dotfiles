@@ -1,0 +1,32 @@
+---
+# Super+Escape breaks an active grab. Applies to newly started VMware windows.
+- name: Let VMware grab the keyboard under Xwayland
+  when: ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
+  vars:
+    _grab_rules_key: /org/gnome/mutter/wayland/xwayland-grab-access-rules
+  block:
+    - name: Allow Xwayland keyboard grabs
+      community.general.dconf:
+        key: /org/gnome/mutter/wayland/xwayland-allow-grabs
+        value: "true"
+        state: present
+
+    - name: Read the existing grab access rules
+      community.general.dconf:
+        key: "{{ _grab_rules_key }}"
+        state: read
+      register: _grab_rules
+
+    - name: Add VMware to the grab access rules, preserving any others
+      community.general.dconf:
+        key: "{{ _grab_rules_key }}"
+        value: "{{ (_grab_existing + vmware_grab_wm_classes) | unique(case_sensitive=true) | to_json }}"
+        state: present
+      vars:
+        _grab_existing: "{{ _grab_rules.value | default('', true) | regex_findall(\"'([^']+)'\") }}"
+      when: vmware_grab_wm_classes | difference(_grab_existing) | length > 0
+
+- name: Note the skipped keyboard grab setup
+  ansible.builtin.debug:
+    msg: No D-Bus session bus — re-run from your desktop session with --tags keyboard
+  when: ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is not defined

@@ -1,0 +1,4 @@
+partial alphanumeric_keys
+xkb_symbols "lsgt_on_tlde" {
+    key <TLDE> { [ less, greater, bar, section ] };
+};

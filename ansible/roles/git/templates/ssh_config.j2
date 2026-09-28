@@ -1,0 +1,13 @@
+# Each host offers only its profile's Bitwarden key, so the right account
+# authenticates even when several share one HostName.
+{% for profile in _git_active | selectattr('key') %}
+
+Host {{ profile.host }}
+    HostName {{ profile.hostname }}
+    User git
+{% if bitwarden_ssh_agent_enabled | bool %}
+    IdentityAgent {{ bitwarden_ssh_agent_sock | replace('$HOME', '~') }}
+{% endif %}
+    IdentityFile {{ git_ssh_key_dir }}/{{ profile.name }}.pub
+    IdentitiesOnly yes
+{% endfor %}

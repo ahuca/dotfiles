@@ -1,0 +1,60 @@
+---
+# Moves an existing ~/.zshrc aside to ~/.zshrc.pre-oh-my-zsh.
+- name: Install oh-my-zsh
+  ansible.builtin.shell:
+    cmd: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    creates: "{{ target_home }}/.oh-my-zsh"
+  environment:
+    RUNZSH: "no"
+    CHSH: "no"
+  when: oh_my_zsh_enabled | bool
+  tags: [zsh]
+
+# Plugins added by hand in ~/.zshrc are dropped.
+- name: Enable oh-my-zsh plugins
+  ansible.builtin.lineinfile:
+    path: "{{ target_home }}/.zshrc"
+    regexp: '^plugins=\('
+    line: "plugins=({{ oh_my_zsh_plugins | join(' ') }})"
+    insertbefore: '^source \$ZSH/oh-my-zsh\.sh'
+  when: oh_my_zsh_enabled | bool
+  tags: [zsh, z]
+
+- name: Locate the zsh binary
+  ansible.builtin.command: which zsh
+  register: _zsh_path
+  changed_when: false
+  check_mode: false
+  when: zsh_set_default_shell | bool
+  tags: [zsh]
+
+- name: Make zsh the login shell
+  ansible.builtin.user:
+    name: "{{ target_user }}"
+    shell: "{{ _zsh_path.stdout }}"
+  become: true
+  when: zsh_set_default_shell | bool
+  tags: [zsh]
+
+- name: Export Bitwarden's SSH agent socket
+  ansible.builtin.blockinfile:
+    path: "{{ target_home }}/.zshrc"
+    create: true
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED — bitwarden ssh agent"
+    block: |
+      export SSH_AUTH_SOCK="{{ bitwarden_ssh_agent_sock }}"
+  when: bitwarden_ssh_agent_enabled | bool
+  tags: [ssh, bitwarden]
+
+# zsh never reads ~/.profile, which is where Ubuntu puts ~/.local/bin on PATH
+# (pipx's ansible, sync-secrets).
+- name: Put ~/.local/bin on PATH for zsh
+  ansible.builtin.blockinfile:
+    path: "{{ target_home }}/.zshrc"
+    create: true
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED — ~/.local/bin on PATH"
+    block: |
+      export PATH="$HOME/.local/bin:$PATH"
+  tags: [zsh, path]

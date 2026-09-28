@@ -1,0 +1,69 @@
+---
+- name: Install apt packages
+  ansible.builtin.apt:
+    name: "{{ apt_packages }}"
+    state: "{{ package_state }}"
+  become: true
+  tags: [apt]
+
+- name: Upgrade the packages that track a release channel
+  ansible.builtin.apt:
+    name: "{{ apt_packages_latest }}"
+    state: latest
+  become: true
+  tags: [apt]
+
+- name: Install snap packages
+  community.general.snap:
+    name: "{{ item.name }}"
+    classic: "{{ item.classic | default(false) }}"
+    state: present
+  loop: "{{ snap_packages }}"
+  loop_control:
+    label: "{{ item.name }}"
+  become: true
+  tags: [snap]
+
+- name: Install D2
+  when: d2_enabled | bool
+  tags: [d2]
+  block:
+    - name: Fetch the D2 install script
+      ansible.builtin.get_url:
+        url: https://d2lang.com/install.sh
+        dest: /tmp/d2-install.sh
+        mode: "0755"
+      changed_when: false
+      check_mode: false
+
+    - name: Run the D2 installer
+      ansible.builtin.command:
+        cmd: /tmp/d2-install.sh
+        creates: "{{ d2_bin }}"
+      become: true
+
+- name: Install UniFi Identity Desktop
+  when: unifi_identity_enabled | bool
+  tags: [unifi]
+  block:
+    - name: Download the UniFi Identity .deb
+      ansible.builtin.get_url:
+        url: "{{ unifi_identity_url }}"
+        dest: /tmp/unifi-identity.deb
+        mode: "0644"
+      changed_when: false
+      check_mode: false
+
+    - name: Install the UniFi Identity .deb
+      ansible.builtin.apt:
+        deb: /tmp/unifi-identity.deb
+      become: true
+  rescue:
+    - name: Explain the UniFi failure without failing the run
+      ansible.builtin.debug:
+        msg: >-
+          UniFi Identity Desktop could not be installed automatically — the
+          firmware-latest URL may no longer resolve to a file. Download the .deb
+          from https://ui.com/download/app/identity-desktop and install it with
+          `sudo apt install -y ./unifi-endpoint-desktop*.deb`, or set
+          unifi_identity_enabled: false.

@@ -1,0 +1,20 @@
+---
+# The existing passphrase slot is kept as a fallback.
+#   ansible-playbook playbooks/tpm-unlock.yml -K
+#   ansible-playbook playbooks/tpm-unlock.yml -K -e tpm_rebind=true
+#   ansible-playbook playbooks/tpm-unlock.yml -K -e tpm_pcrs=0,7
+#   ansible-playbook playbooks/tpm-unlock.yml -K -e tpm_device=/dev/nvme0n1p3
+- name: Bind LUKS to the TPM2
+  hosts: workstation
+  gather_facts: true
+
+  vars_prompt:
+    - name: luks_passphrase
+      prompt: |
+        Current LUKS disk passphrase (needed only when a new TPM slot is created;
+        press Enter to skip if a binding already exists)
+      private: true
+      default: ""
+
+  roles:
+    - role: tpm_unlock

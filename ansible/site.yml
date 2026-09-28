@@ -1,0 +1,5 @@
+---
+# Hardware playbooks touch boot/kernel state and are run separately:
+#   ansible-playbook playbooks/tpm-unlock.yml -K
+#   ansible-playbook playbooks/vmware.yml -K
+- ansible.builtin.import_playbook: playbooks/workstation.yml

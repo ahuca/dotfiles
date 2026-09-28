@@ -1,0 +1,79 @@
+---
+- name: Install Docker Engine
+  when: docker_enabled | bool
+  block:
+    - name: Install Docker's signing key
+      ansible.builtin.get_url:
+        url: "{{ docker_key_url }}"
+        dest: "{{ docker_keyring }}"
+        mode: "0644"
+        owner: root
+        group: root
+      register: docker_signing_key
+      until: docker_signing_key is succeeded
+      retries: 3
+      delay: 5
+      become: true
+
+    - name: Register Docker's apt repository
+      ansible.builtin.deb822_repository:
+        name: docker
+        types: [deb]
+        uris: "{{ docker_repo_uri }}"
+        suites: "{{ ansible_facts.distribution_release }}"
+        components: [stable]
+        architectures: ["{{ deb_architecture }}"]
+        signed_by: "{{ docker_keyring }}"
+        state: present
+        enabled: true
+      become: true
+      register: _docker_repo
+
+    - name: Remove a legacy one-line docker.list
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/docker.list
+        state: absent
+      become: true
+      register: _docker_legacy_list
+
+    - name: Refresh the apt cache for the new repo
+      ansible.builtin.apt:
+        update_cache: true
+      become: true
+      when: _docker_repo is changed or _docker_legacy_list is changed
+
+    - name: Remove conflicting Ubuntu-archive packages
+      ansible.builtin.apt:
+        name: "{{ docker_conflicting_packages }}"
+        state: absent
+      become: true
+
+    - name: Install Docker Engine, CLI, containerd, Buildx and Compose
+      ansible.builtin.apt:
+        name: "{{ docker_packages }}"
+        state: "{{ package_state }}"
+      become: true
+
+    # Lets the next task run under --check before docker-ce is installed.
+    - name: Ensure the docker group exists
+      ansible.builtin.group:
+        name: docker
+        system: true
+        state: present
+      become: true
+
+    - name: Let {{ docker_users | join(', ') }} use docker without sudo
+      ansible.builtin.user:
+        name: "{{ item }}"
+        groups: [docker]
+        append: true
+      loop: "{{ docker_users }}"
+      become: true
+      register: _docker_group
+
+    - name: Explain how to pick up the new group
+      ansible.builtin.debug:
+        msg: >-
+          Added to the docker group. Log out and back in (or run `newgrp docker`
+          in a shell) before `docker run hello-world` works without sudo.
+      when: _docker_group is changed

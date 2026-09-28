@@ -1,0 +1,15 @@
+---
+- name: Create the VMware scratch directory
+  ansible.builtin.file:
+    path: "{{ vmware_tmp_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Point VMware's temp dir off the RAM-backed /tmp
+  ansible.builtin.lineinfile:
+    path: "{{ vmware_config }}"
+    create: true
+    mode: "0644"
+    regexp: '^tmpDirectory\s*='
+    line: 'tmpDirectory = "{{ vmware_tmp_dir }}"'
+  become: true

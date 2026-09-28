@@ -1,0 +1,21 @@
+---
+- name: Install nvm
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/{{ nvm_version }}/install.sh | bash
+    creates: "{{ target_home }}/.nvm/nvm.sh"
+  environment:
+    NVM_DIR: "{{ target_home }}/.nvm"
+  when: nvm_enabled | bool
+
+- name: Install node and make it the default in new shells
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      . "$NVM_DIR/nvm.sh"
+      nvm install {{ nvm_node_version }}
+      nvm alias default '{{ nvm_default_alias }}'
+    creates: "{{ target_home }}/.nvm/alias/default"
+    executable: /bin/bash
+  environment:
+    NVM_DIR: "{{ target_home }}/.nvm"
+  when: nvm_enabled | bool

@@ -1,0 +1,157 @@
+---
+# Per-remote identities. A repo whose remote is git@<host>:... (or
+# ssh://git@<host>/...) includes that profile's file, which sets user.email and
+# the agent key matching it; other repos keep the global identity. ssh offers
+# that same key for the host, so the matching account authenticates.
+# Host and email come from the environment, else from the files a previous run
+# wrote, so they are only needed once per machine.
+- name: Read the git profiles written by a previous run
+  ansible.builtin.command:
+    argv:
+      - git
+      - config
+      - --file
+      - "{{ git_config_dir }}/{{ item.name }}.gitconfig"
+      - --get-regexp
+      - ^user[.](email|signingkey)$
+  loop: "{{ git_profiles }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: _profile_files
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Read the hosts those profiles are routed by
+  ansible.builtin.command:
+    argv:
+      - git
+      - config
+      - --file
+      - "{{ git_profiles_file }}"
+      - --get-regexp
+      - ^includeif[.].*[.]path$
+  register: _profile_hosts
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Start with no profiles
+  ansible.builtin.set_fact:
+    _git_profiles: []
+
+- name: Resolve the git profiles
+  ansible.builtin.set_fact:
+    _git_profiles: >-
+      {{ _git_profiles + [{'name': item.0.name, 'host': _host, 'hostname': item.0.hostname,
+                           'email': _email, 'key': _key}] }}
+  loop: "{{ git_profiles | zip(_profile_files.results) | list }}"
+  loop_control:
+    label: "{{ item.0.name }}"
+  vars:
+    _old: "{{ item.1.stdout_lines | default([]) }}"
+    _email: >-
+      {{ item.0.email or (_old | select('match', '^user[.]email ')
+         | map('regex_replace', '^user[.]email ', '') | first | default('')) }}
+    # includeif.hasconfig:remote.*.url:git@<host>:**/**.path <name>.gitconfig
+    _host: >-
+      {{ item.0.host or (_profile_hosts.stdout_lines | default([])
+         | select('search', 'url:git@[^:]+:.* ' ~ (item.0.name | regex_escape) ~ '[.]gitconfig$')
+         | map('regex_replace', '^.*url:git@', '') | map('regex_replace', ':.*$', '')
+         | first | default('')) }}
+    # The agent key whose comment is the email; the one written last time
+    # while the vault is locked.
+    _key: >-
+      {{ ((_agent_keys.stdout_lines | default([])
+           | select('match', '.* ' ~ (_email | regex_escape) ~ '$')
+           | first | default('')).split(' ')[:2] | join(' '))
+         or (_old | select('match', '^user[.]signingkey key::')
+             | map('regex_replace', '^user[.]signingkey key::', '') | first | default(''))
+         or ((query('ansible.builtin.file', git_ssh_key_dir ~ '/' ~ item.0.name ~ '.pub', errors='ignore')
+              | first | default('')).split(' ')[:2] | join(' ')) }}
+
+- name: Pick the profiles that have a host and an email
+  ansible.builtin.set_fact:
+    _git_active: "{{ _git_profiles | selectattr('host') | selectattr('email') | list }}"
+
+- name: Note the git profiles being skipped
+  ansible.builtin.debug:
+    msg: >-
+      Skipping git profile '{{ item.name }}': no {{ 'SSH host' if not item.host else 'email' }}
+      for it. Set {{ 'GIT_' ~ (item.name | upper) ~ ('_HOST' if not item.host else '_EMAIL') }}
+      and re-run; it is kept for later runs.
+  loop: "{{ _git_profiles | rejectattr('name', 'in', _git_active | map(attribute='name')) }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Note the git profiles without a key
+  ansible.builtin.debug:
+    msg: >-
+      Git profile '{{ item.name }}' has no key in the Bitwarden agent, so its
+      commits are signed with the global key and ssh has no route for its
+      host. Unlock Bitwarden with an SSH key whose comment is that profile's
+      email, then re-run.
+  loop: "{{ _git_active | rejectattr('key') }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Ensure the git config directory exists
+  ansible.builtin.file:
+    path: "{{ git_config_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Write the git profiles
+  ansible.builtin.template:
+    src: profile.gitconfig.j2
+    dest: "{{ git_config_dir }}/{{ item.name }}.gitconfig"
+    mode: "0644"
+  loop: "{{ _git_active }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Route repos to a profile by their remote
+  ansible.builtin.template:
+    src: profiles.gitconfig.j2
+    dest: "{{ git_profiles_file }}"
+    mode: "0644"
+
+# ~/.gitconfig, not ~/.config/git/config: git reads that one first, so its
+# [user] would lose to the global one. The include also has to come after
+# [user]; git config appends new sections, so it does.
+- name: Include the profiles from ~/.gitconfig
+  community.general.git_config:
+    scope: global
+    name: include.path
+    value: "{{ git_profiles_file }}"
+
+# ssh can only pick one of the agent's keys through a public key file, so each
+# profile's is written from the agent. Regenerated on every run: the keys
+# themselves never leave Bitwarden.
+- name: Route SSH hosts to their profile's key
+  when: git_profiles_ssh | bool
+  block:
+    - name: Ensure the SSH key directory exists
+      ansible.builtin.file:
+        path: "{{ git_ssh_key_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Write the profiles' public keys
+      ansible.builtin.copy:
+        content: "{{ item.key }} {{ item.email }}\n"
+        dest: "{{ git_ssh_key_dir }}/{{ item.name }}.pub"
+        mode: "0644"
+      loop: "{{ _git_active | selectattr('key') }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # At the top: ssh takes the first value it sees for each option.
+    - name: Add the profile hosts to ~/.ssh/config
+      ansible.builtin.blockinfile:
+        path: "{{ target_home }}/.ssh/config"
+        create: true
+        mode: "0600"
+        insertbefore: BOF
+        marker: "# {mark} dotfiles: git profiles"
+        block: "{{ lookup('ansible.builtin.template', 'ssh_config.j2') }}"

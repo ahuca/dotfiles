@@ -1,0 +1,25 @@
+---
+# Draw VMware at 1x under Xwayland.
+#
+# With GNOME's automatic Xwayland scale (0), X11 apps are drawn at the highest
+# monitor scale. With a 2x laptop panel and a 1x external monitor, a VMware
+# window on the 1x monitor is drawn at 2x and shrunk: the guest renders 4x the
+# pixels and pointer input goes through the scaling, so the mouse glitches.
+# `xrandr --listmonitors` shows the size X11 sees (double the real size at 2x).
+#
+# On GNOME 50 this key is what matters; dropping xwayland-native-scaling from
+# org.gnome.mutter experimental-features does not change it. Applies live;
+# X11 apps on the 2x panel get a little blurry.
+- name: Set the Xwayland scaling factor
+  community.general.dconf:
+    key: /org/gnome/mutter/wayland/xwayland-scaling-factor
+    value: "{{ vmware_xwayland_scaling_factor | float }}"
+    state: present
+  when: ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
+
+- name: Note the skipped scaling setting
+  ansible.builtin.debug:
+    msg: >-
+      No D-Bus session bus — skipping the Xwayland scale. Re-run this from
+      inside your desktop session: ansible-playbook playbooks/vmware.yml --tags scaling
+  when: ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is not defined

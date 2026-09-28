@@ -1,0 +1,92 @@
+---
+- name: List existing TPM2 keyslots
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      clevis luks list -d {{ luks_device }} 2>/dev/null | awk -F: '/tpm2/{gsub(/ /,"",$1); print $1}'
+    executable: /bin/bash
+  register: _tpm_slots
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  become: true
+
+- name: Stop here when a binding already exists and no rebind was asked for
+  when:
+    - _tpm_slots.stdout_lines | length > 0
+    - not (tpm_rebind | bool)
+  block:
+    - name: Explain what to do instead
+      ansible.builtin.debug:
+        msg: >-
+          A TPM binding already exists (keyslot(s): {{ _tpm_slots.stdout_lines | join(', ') }}).
+          To reseal it against current PCRs, or to change tpm_pcrs, re-run with
+          -e tpm_rebind=true.
+
+    - name: End the play
+      ansible.builtin.meta: end_play
+
+- name: Remove the stale TPM bindings
+  ansible.builtin.command: clevis luks unbind -d {{ luks_device }} -s {{ item }} -f
+  loop: "{{ _tpm_slots.stdout_lines }}"
+  become: true
+  when: tpm_rebind | bool
+
+- name: Require the LUKS passphrase
+  ansible.builtin.assert:
+    that: luks_passphrase | default('') | length > 0
+    fail_msg: >-
+      No LUKS passphrase given. Run the playbook interactively (it prompts), or
+      pass -e luks_passphrase=... — clevis needs it to authenticate the new slot.
+    quiet: true
+
+- name: Bind the LUKS volume to the TPM2
+  ansible.builtin.command:
+    cmd: clevis luks bind -d {{ luks_device }} -k - tpm2 {{ _clevis_config | to_json | quote }}
+    stdin: "{{ luks_passphrase }}"
+    stdin_add_newline: false
+  vars:
+    _clevis_config:
+      pcr_bank: "{{ pcr_bank }}"
+      pcr_ids: "{{ tpm_pcrs }}"
+  become: true
+  no_log: true
+
+- name: Re-read the TPM2 keyslots
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      clevis luks list -d {{ luks_device }} 2>/dev/null | awk -F: '/tpm2/{gsub(/ /,"",$1); print $1}'
+    executable: /bin/bash
+  register: _tpm_slots_new
+  changed_when: false
+  check_mode: false
+  become: true
+
+- name: Confirm the binding landed in the LUKS header
+  ansible.builtin.assert:
+    that: _tpm_slots_new.stdout_lines | length > 0
+    fail_msg: "Binding did not appear in the LUKS header."
+    quiet: true
+
+- name: Report the new keyslot
+  ansible.builtin.debug:
+    msg: "Bound in keyslot {{ _tpm_slots_new.stdout_lines[0] }}"
+
+- name: Attempt a pre-reboot unseal self-test
+  ansible.builtin.command: clevis luks pass -d {{ luks_device }} -s {{ _tpm_slots_new.stdout_lines[0] }}
+  register: _unseal
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  become: true
+  no_log: true
+
+- name: Report the self-test result
+  ansible.builtin.debug:
+    msg: "{{ (_unseal.rc == 0) | ternary(
+             'TPM unseal works.',
+             'Could not self-test the unseal (this does not mean it is broken; PCR values at boot can differ from now). The reboot will confirm. Passphrase untouched.') }}"
+
+- name: Include the initramfs steps
+  ansible.builtin.import_tasks: initramfs.yml

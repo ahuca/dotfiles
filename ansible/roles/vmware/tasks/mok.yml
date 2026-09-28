@@ -1,0 +1,80 @@
+---
+- name: Check for an existing MOK key pair
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: _mok_files
+  loop:
+    - "{{ vmware_mok_dir }}/MOK.priv"
+    - "{{ vmware_mok_dir }}/MOK.der"
+  become: true
+
+- name: Generate a MOK key
+  when: _mok_files.results | rejectattr('stat.exists') | list | length > 0
+  become: true
+  block:
+    - name: Create the MOK directory
+      ansible.builtin.file:
+        path: "{{ vmware_mok_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Create the signing key pair
+      ansible.builtin.command:
+        cmd: >-
+          openssl req -new -x509 -newkey rsa:2048
+          -keyout {{ vmware_mok_dir }}/MOK.priv
+          -outform DER -out {{ vmware_mok_dir }}/MOK.der
+          -nodes -days 36500 -subj /CN=VMware Module Signing/
+        creates: "{{ vmware_mok_dir }}/MOK.der"
+
+# --test-key can exit non-zero even when it reports the key enrolled.
+- name: Check whether the MOK key is enrolled
+  ansible.builtin.command: mokutil --test-key {{ vmware_mok_dir }}/MOK.der
+  register: _mok_test
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  become: true
+
+- name: Enroll the MOK key
+  when: "'already enrolled' not in _mok_test.stdout"
+  block:
+    - name: Require an enrollment password
+      ansible.builtin.assert:
+        that: mok_password | default('') | length > 0
+        fail_msg: >-
+          The MOK key is not enrolled and no enrollment password was given.
+          Run playbooks/vmware.yml interactively (it prompts), or enroll by hand
+          with `sudo mokutil --import {{ vmware_mok_dir }}/MOK.der`.
+        quiet: true
+
+    # mokutil asks for the password twice; it reads both from stdin.
+    - name: Queue the enrollment request
+      ansible.builtin.command:
+        cmd: mokutil --import {{ vmware_mok_dir }}/MOK.der
+        stdin: "{{ mok_password }}\n{{ mok_password }}\n"
+        stdin_add_newline: false
+      become: true
+      no_log: true
+
+    - name: Verify a pending enrollment request exists
+      ansible.builtin.command: mokutil --list-new
+      register: _mok_pending
+      changed_when: false
+      check_mode: false
+      failed_when: _mok_pending.stdout | trim | length == 0
+      become: true
+
+    - name: Explain the reboot dance
+      ansible.builtin.debug:
+        msg:
+          - "A one-time password was just set. Now:"
+          - "  1. Reboot."
+          - "  2. At the blue \"MOK Management\" screen:"
+          - "       Enroll MOK -> Continue -> Yes -> (enter that password) -> Reboot"
+          - "     That screen uses a US QWERTY layout and hides what you type,"
+          - "     so type the password as it falls on US keys."
+          - "  3. Re-run: ansible-playbook playbooks/vmware.yml --tags modules"
+
+    - name: Stop here until the key is enrolled
+      ansible.builtin.meta: end_play

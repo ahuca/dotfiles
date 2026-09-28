@@ -1,0 +1,70 @@
+---
+- name: Gather installed packages
+  ansible.builtin.package_facts:
+    manager: apt
+
+- name: Work out which repositories we still need to manage
+  ansible.builtin.set_fact:
+    managed_repositories: >-
+      {{ apt_repositories
+         | rejectattr('managed_by_package', 'defined')
+         | list
+         + apt_repositories
+         | selectattr('managed_by_package', 'defined')
+         | rejectattr('managed_by_package', 'in', ansible_facts.packages)
+         | list }}
+
+- name: Report repositories left to the vendor's own postinst
+  ansible.builtin.debug:
+    msg: >-
+      Leaving {{ item.name }} to the {{ item.managed_by_package }} package,
+      which rewrites its own sources file.
+  loop: "{{ apt_repositories | selectattr('managed_by_package', 'defined')
+            | selectattr('managed_by_package', 'in', ansible_facts.packages) | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Install upstream signing keys
+  ansible.builtin.get_url:
+    url: "{{ item.key_url }}"
+    dest: "{{ apt_keyring_dir }}/{{ item.keyring }}"
+    mode: "0644"
+    owner: root
+    group: root
+  register: signing_key
+  until: signing_key is succeeded
+  retries: 3
+  delay: 5
+  loop: "{{ managed_repositories }}"
+  loop_control:
+    label: "{{ item.name }}"
+  become: true
+  notify: Refresh apt cache
+
+- name: Register apt repositories
+  ansible.builtin.deb822_repository:
+    name: "{{ item.name }}"
+    types: [deb]
+    uris: "{{ item.uris }}"
+    suites: "{{ item.suites }}"
+    components: "{{ item.components }}"
+    architectures: "{{ item.architectures | default(omit) }}"
+    signed_by: "{{ apt_keyring_dir }}/{{ item.keyring }}"
+    state: present
+    enabled: true
+  loop: "{{ managed_repositories }}"
+  loop_control:
+    label: "{{ item.name }}"
+  become: true
+  notify: Refresh apt cache
+
+- name: Remove the legacy one-line sources entries
+  ansible.builtin.file:
+    path: "/etc/apt/sources.list.d/{{ item }}"
+    state: absent
+  loop: "{{ legacy_apt_lists }}"
+  become: true
+  notify: Refresh apt cache
+
+- name: Refresh apt cache now so later roles see the new repos
+  ansible.builtin.meta: flush_handlers

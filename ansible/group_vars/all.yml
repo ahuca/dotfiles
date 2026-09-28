@@ -1,0 +1,228 @@
+---
+target_user: "{{ lookup('env', 'USER') }}"
+target_home: "{{ lookup('env', 'HOME') }}"
+
+# present | latest
+package_state: present
+
+# ── apt repositories ────────────────────────────────────────────────
+# managed_by_package: the package writes its own .sources on upgrade, so ours
+# is only used for the first install and skipped once it is present.
+apt_keyring_dir: /etc/apt/keyrings
+
+apt_repositories:
+  - name: charm
+    key_url: https://repo.charm.sh/apt/gpg.key
+    keyring: charm.asc
+    uris: https://repo.charm.sh/apt/
+    suites: "*"
+    components: "*"
+
+  - name: vscode
+    key_url: https://packages.microsoft.com/keys/microsoft.asc
+    keyring: microsoft.asc
+    uris: https://packages.microsoft.com/repos/code
+    suites: stable
+    components: main
+    architectures: [amd64, arm64, armhf]
+    managed_by_package: code
+
+  - name: github-cli
+    key_url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+    keyring: githubcli-archive-keyring.gpg
+    uris: https://cli.github.com/packages
+    suites: stable
+    components: main
+    architectures: ["{{ deb_architecture }}"]
+
+  - name: claude-code
+    key_url: https://downloads.claude.ai/keys/claude-code.asc
+    # fingerprint 31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE
+    keyring: claude-code.asc
+    uris: "https://downloads.claude.ai/claude-code/apt/{{ claude_code_channel }}"
+    suites: "{{ claude_code_channel }}"
+    components: main
+
+  - name: microsoft-edge
+    key_url: https://packages.microsoft.com/keys/microsoft.asc
+    keyring: microsoft.asc
+    uris: https://packages.microsoft.com/repos/edge
+    suites: stable
+    components: main
+    architectures: [amd64]
+    managed_by_package: microsoft-edge-stable
+
+  # For Intune Portal. Signed with the 2025 key, not microsoft.asc.
+  - name: microsoft-prod
+    key_url: https://packages.microsoft.com/keys/microsoft-2025.asc
+    keyring: microsoft-2025.asc
+    uris: "https://packages.microsoft.com/ubuntu/{{ ansible_facts.distribution_version }}/prod"
+    suites: "{{ ansible_facts.distribution_release }}"
+    components: main
+    architectures: [amd64]
+
+# Docker's repo is registered by the docker role.
+
+# One-line .list files from older manual setups; they duplicate the above.
+legacy_apt_lists:
+  - charm.list
+  - vscode.list
+  - github-cli.list
+  - claude-code.list
+  - microsoft-edge-stable.list
+  - microsoft-prod.list
+
+# stable | latest
+claude_code_channel: latest
+
+# ── packages ────────────────────────────────────────────────────────
+apt_packages:
+  - neovim
+  - 7zip
+  - keepassxc
+  - copyq
+  - wl-clipboard
+  - ghostty
+  - zsh
+  - glow
+  - code
+  - gh
+  - microsoft-edge-stable
+  - intune-portal
+
+# Upgraded on every run, regardless of package_state.
+apt_packages_latest:
+  - claude-code
+
+snap_packages:
+  - name: bitwarden
+  # The prod apt repo only carries powershell-preview.
+  - name: powershell
+    classic: true
+
+d2_enabled: true
+d2_bin: /usr/local/bin/d2
+
+# Fallback if this stops resolving: https://ui.com/download/app/identity-desktop
+unifi_identity_enabled: true
+unifi_identity_url: "https://fw-update.ui.com/api/v2/firmware-latest/data?filter=eq~~product~~unifi-endpoint-desktop-app-deb&filter=eq~~platform~~linux&filter=eq~~channel~~release"
+
+# ── desktop (GNOME) ─────────────────────────────────────────────────
+# `copyq menu` does not work on Wayland.
+copyq_hotkey_enabled: true
+copyq_hotkey_binding: "<Control><Alt>v"
+copyq_hotkey_command: "copyq toggle"
+copyq_hotkey_name: "CopyQ toggle"
+copyq_autostart: true
+
+# Extra shortcuts for the window manager's "Always on top" toggle; added to any
+# already bound. [] leaves the setting alone.
+wm_toggle_above_bindings: ["<Super><Control>t"]
+
+# Put < > | on the key left of 1, for keyboards without the key left of Z.
+xkb_lsgt_on_tlde: false
+
+# ── ghostty ─────────────────────────────────────────────────────────
+ghostty_config_enabled: true
+
+# ── shell ───────────────────────────────────────────────────────────
+oh_my_zsh_enabled: true
+oh_my_zsh_plugins: [git, z]
+zsh_set_default_shell: true
+
+# Appears once "Enable SSH agent" is ticked in Bitwarden's settings.
+bitwarden_ssh_agent_enabled: true
+bitwarden_ssh_agent_sock: "$HOME/snap/bitwarden/current/.bitwarden-ssh-agent.sock"
+
+# ── git ─────────────────────────────────────────────────────────────
+# Commit/tag signing with SSH keys held in the Bitwarden agent.
+git_signing_enabled: true
+# Not stored in the repo: taken from $GIT_SIGNING_EMAIL / $GIT_SIGNING_KEY,
+# else git's user.email and the agent key whose comment matches it
+# (`ssh-add -L`). Neither found => role skipped.
+git_signing_email: "{{ lookup('env', 'GIT_SIGNING_EMAIL') }}"
+git_signing_key: "{{ lookup('env', 'GIT_SIGNING_KEY') }}"
+git_config_dir: "{{ target_home }}/.config/git"
+git_allowed_signers_file: "{{ git_config_dir }}/allowed_signers"
+
+# Per-remote identity via includeIf "hasconfig:remote.*.url:...": a repo whose
+# remote is git@<host>:... gets that profile's user.email and the agent key
+# whose comment matches it. Other repos keep the global user.email.
+# Not stored in the repo: host/email come from $GIT_<NAME>_HOST /
+# $GIT_<NAME>_EMAIL, else from the files a previous run wrote. A profile
+# missing either is skipped. host is an SSH Host alias for a second account
+# on the same forge (hostname), or the forge itself.
+git_profiles_enabled: true
+git_profiles:
+  - name: personal
+    host: "{{ lookup('env', 'GIT_PERSONAL_HOST', default='github.com') }}"
+    hostname: github.com
+    email: "{{ lookup('env', 'GIT_PERSONAL_EMAIL') }}"
+  - name: work
+    host: "{{ lookup('env', 'GIT_WORK_HOST') }}"
+    hostname: github.com
+    email: "{{ lookup('env', 'GIT_WORK_EMAIL') }}"
+git_profiles_file: "{{ git_config_dir }}/profiles.gitconfig"
+# A Host block per profile in ~/.ssh/config that offers only its Bitwarden key.
+# The public halves are written from the agent; no key files are kept by hand.
+git_profiles_ssh: true
+git_ssh_key_dir: "{{ target_home }}/.ssh/bitwarden"
+
+# ── docker ──────────────────────────────────────────────────────────
+docker_enabled: true
+# Effectively root on this machine.
+docker_users: ["{{ target_user }}"]
+
+# ── node ────────────────────────────────────────────────────────────
+nvm_enabled: true
+nvm_version: v0.40.1
+nvm_node_version: "--lts"     # "node" for newest Current
+nvm_default_alias: "lts/*"
+
+# ── homebrew ────────────────────────────────────────────────────────
+homebrew_enabled: true
+homebrew_prefix: /home/linuxbrew/.linuxbrew
+homebrew_packages:
+  - opencode
+
+# ── TPM / LUKS auto-unlock (playbooks/tpm-unlock.yml) ───────────────
+tpm_pcrs: "7"          # e.g. "0,7"
+tpm_device: ""         # empty => auto-detect the LUKS volume behind /
+tpm_rebind: false      # true => drop the existing TPM slot and re-seal
+
+# ── VMware Workstation (playbooks/vmware.yml) ───────────────────────
+vmware_vm_dir: ""                             # VM folder for the perms fix
+vmware_tmp_dir: "{{ target_home }}/vmware-tmp"  # off the RAM-backed /tmp
+vmware_mok_dir: /var/lib/shim-signed/mok
+vmware_config: /etc/vmware/config
+# Check with `xprop WM_CLASS`.
+vmware_grab_wm_classes: [vmware, Vmware]
+# Xwayland scale; 0 is GNOME's automatic default. 1 stops a VMware window on a
+# 1x monitor being drawn at 2x (the highest monitor scale) and shrunk.
+vmware_xwayland_scaling_factor: 1
+
+# ── secrets: API keys from Vaultwarden via rbw ──────────────────────
+# Ansible never sees a key; sync-secrets fetches them into tmpfs at runtime.
+rbw_enabled: true
+# Not stored in the repo: bootstrap.sh takes them from $RBW_BASE_URL/$RBW_EMAIL,
+# else ~/.config/rbw/config.json, else a one-time prompt. Empty => role skipped.
+rbw_base_url: "{{ lookup('env', 'RBW_BASE_URL') }}"
+rbw_email: "{{ lookup('env', 'RBW_EMAIL') }}"
+rbw_folder: Work                             # default for opencode_secrets
+rbw_pinentry: pinentry-gnome3                # pinentry-curses when headless
+rbw_lock_timeout: 28800
+rbw_sync_interval: 3600                      # 0 disables
+rbw_sync_on_login: false
+
+# tmpfs, so plaintext keys never reach disk.
+opencode_secrets_dir: "/run/user/{{ ansible_facts.user_uid }}/opencode"
+
+# folder is case-sensitive; field defaults to the password.
+# Check names with: rbw list --fields name,folder
+opencode_secrets:
+  - { dest: openrouter.work.key, folder: Work, item: openrouter.ai, field: apikey }
+  - { dest: openrouter.personal.key, folder: Personal, item: openrouter.ai, field: apikey }
+  - { dest: jira.work.user, folder: Work, item: id.atlassian.com, field: username }
+  - { dest: jira.work.key, folder: Work, item: id.atlassian.com, field: apikey }
+  # Site URL (https://<tenant>.atlassian.net) lives in the vault, not the repo.
+  - { dest: jira.work.url, folder: Work, item: id.atlassian.com, field: url }

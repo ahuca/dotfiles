@@ -1,0 +1,164 @@
+---
+# tpm_rebind instead of `clevis luks regen`: regen must unseal first, which
+# fails once the PCRs have moved — exactly when a reseal is needed.
+- name: List installed initramfs generators
+  ansible.builtin.command: dpkg-query -W -f=${Package}:${Status}\n dracut initramfs-tools
+  register: _initrd_pkgs
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Decide which initramfs system is in play
+  ansible.builtin.set_fact:
+    initrd_sys: "{{ 'initramfs-tools' if (not _has_dracut and _has_itools) else 'dracut' }}"
+    has_initramfs_tools: "{{ _has_itools }}"
+  vars:
+    _has_dracut: "{{ 'dracut:install ok installed' in _initrd_pkgs.stdout }}"
+    _has_itools: "{{ 'initramfs-tools:install ok installed' in _initrd_pkgs.stdout }}"
+
+- name: Report the initramfs system
+  ansible.builtin.debug:
+    msg: "Initramfs system: {{ initrd_sys }}"
+
+# clevis-initramfs pulls in initramfs-tools, which evicts dracut and leaves an
+# initrd without cryptsetup: unbootable.
+- name: Remove clevis-initramfs on a dracut system (it breaks boot)
+  ansible.builtin.apt:
+    name: clevis-initramfs
+    state: absent
+    purge: true
+  become: true
+  when: initrd_sys == 'dracut'
+
+- name: Warn when both dracut and initramfs-tools are installed
+  ansible.builtin.debug:
+    msg: >-
+      Both dracut AND initramfs-tools are installed — an inconsistent state.
+      They can't both generate the initramfs. If boot misbehaves, purge
+      initramfs-tools and reinstall dracut
+      (sudo apt install --reinstall dracut dracut-core).
+  when:
+    - initrd_sys == 'dracut'
+    - has_initramfs_tools | bool
+
+- name: Find the LUKS volume that backs the root filesystem
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      root_src="$(findmnt -no SOURCE / | sed 's/\[.*//')"
+      lsblk -rpsno NAME,FSTYPE "$root_src" 2>/dev/null | awk '$2=="crypto_LUKS"{print $1}' | sort -u
+    executable: /bin/bash
+  register: _luks_candidates
+  changed_when: false
+  check_mode: false
+  become: true
+  when: not tpm_device
+
+- name: Fail clearly when root is not on LUKS, or is ambiguous
+  ansible.builtin.assert:
+    that: _luks_candidates.stdout_lines | length == 1
+    fail_msg: >-
+      {{ (_luks_candidates.stdout_lines | length == 0)
+         | ternary('Root filesystem is not on LUKS. (Running from a live USB? Chroot in and re-run on the installed system.)',
+                   'Multiple LUKS devices under /: ' ~ (_luks_candidates.stdout_lines | join(', ')) ~ ' — set tpm_device to pick one.') }}
+    quiet: true
+  when: not tpm_device
+
+- name: Settle on the LUKS device
+  ansible.builtin.set_fact:
+    luks_device: "{{ tpm_device if tpm_device else _luks_candidates.stdout_lines[0] }}"
+
+- name: Verify it really is a LUKS device
+  ansible.builtin.command: cryptsetup isLuks {{ luks_device }}
+  changed_when: false
+  check_mode: false
+  become: true
+
+- name: Report the LUKS device
+  ansible.builtin.debug:
+    msg: "LUKS device: {{ luks_device }}"
+
+- name: Check for a TPM device
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: _tpm_dev
+  loop: [/dev/tpmrm0, /dev/tpm0]
+
+- name: Require a TPM
+  ansible.builtin.assert:
+    that: _tpm_dev.results | selectattr('stat.exists') | list | length > 0
+    fail_msg: "No TPM device found (/dev/tpmrm0). Is TPM/PTT enabled in firmware?"
+    quiet: true
+
+- name: Check the Secure Boot state
+  ansible.builtin.command: mokutil --sb-state
+  register: _sb_state
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Warn when Secure Boot is disabled
+  ansible.builtin.debug:
+    msg: >-
+      Secure Boot appears DISABLED. A PCR7 binding will still work, but it will
+      break (fall back to passphrase) if you later turn Secure Boot on.
+  when: "'SecureBoot enabled' not in (_sb_state.stdout | default(''))"
+
+- name: Check whether clevis-systemd is available in the archive
+  ansible.builtin.command: apt-cache show clevis-systemd
+  register: _clevis_systemd
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Install the clevis stack
+  ansible.builtin.apt:
+    name: "{{ _base + _initrd + _systemd }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+  vars:
+    _base: [clevis, clevis-luks, clevis-tpm2, tpm2-tools]
+    _initrd: "{{ ['clevis-dracut'] if initrd_sys == 'dracut' else ['clevis-initramfs'] }}"
+    _systemd: "{{ ['clevis-systemd'] if (initrd_sys == 'dracut' and _clevis_systemd.rc == 0) else [] }}"
+
+# clevis defaults to sha1, which many TPMs leave empty.
+- name: Probe the sha256 PCR bank
+  ansible.builtin.command: tpm2_pcrread sha256:{{ tpm_pcrs }}
+  register: _bank_sha256
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  become: true
+
+- name: Probe the sha1 PCR bank
+  ansible.builtin.command: tpm2_pcrread sha1:{{ tpm_pcrs }}
+  register: _bank_sha1
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  become: true
+  when: _bank_sha256.rc != 0
+
+- name: Require a readable PCR bank
+  ansible.builtin.assert:
+    that: _bank_sha256.rc == 0 or (_bank_sha1.rc | default(1)) == 0
+    fail_msg: "Could not read PCR(s) {{ tpm_pcrs }} from the TPM in either bank."
+    quiet: true
+
+- name: Settle on the PCR bank
+  ansible.builtin.set_fact:
+    pcr_bank: "{{ 'sha256' if _bank_sha256.rc == 0 else 'sha1' }}"
+
+- name: Note the sha1 fallback
+  ansible.builtin.debug:
+    msg: "sha256 PCR bank unavailable; falling back to sha1."
+  when: pcr_bank == 'sha1'
+
+- name: Report the PCR selection
+  ansible.builtin.debug:
+    msg: "Using PCR bank {{ pcr_bank }}, PCR(s) {{ tpm_pcrs }}"
+
+- name: Include the bind steps
+  ansible.builtin.import_tasks: bind.yml

@@ -1,0 +1,141 @@
+---
+- name: Check the Secure Boot state
+  ansible.builtin.command: mokutil --sb-state
+  register: _st_sb
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Check the MOK key
+  ansible.builtin.stat:
+    path: "{{ vmware_mok_dir }}/MOK.der"
+  register: _st_mok_file
+  become: true
+
+- name: Check MOK enrollment
+  ansible.builtin.command: mokutil --test-key {{ vmware_mok_dir }}/MOK.der
+  register: _st_mok
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  become: true
+  when: _st_mok_file.stat.exists
+
+- name: Check which modules are loaded
+  ansible.builtin.command: lsmod
+  register: _st_lsmod
+  changed_when: false
+  check_mode: false
+
+- name: Check where each module was built
+  ansible.builtin.command: modinfo -n {{ item }}
+  register: _st_paths
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  loop: [vmmon, vmnet]
+
+- name: Check which modules are signed
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      modinfo {{ item }} 2>/dev/null | grep -qi '^signer'
+    executable: /bin/bash
+  register: _st_signed
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  loop: [vmmon, vmnet]
+
+- name: Check whether /tmp is RAM-backed
+  ansible.builtin.command: findmnt -no FSTYPE /tmp
+  register: _st_tmpfs
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Check whether tmpDirectory is redirected
+  ansible.builtin.command: grep -c ^tmpDirectory {{ vmware_config }}
+  register: _st_tmpdir
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  become: true
+
+- name: Count rejected-module messages in the kernel log
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      dmesg 2>/dev/null | grep -ci 'unsigned module is rejected' || true
+    executable: /bin/bash
+  register: _st_dmesg
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  become: true
+
+- name: Read the Xwayland scaling factor
+  ansible.builtin.command: gsettings get org.gnome.mutter.wayland xwayland-scaling-factor
+  register: _st_xscale
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
+
+- name: Stat the VM directory
+  ansible.builtin.stat:
+    path: "{{ vmware_vm_dir }}"
+  register: _st_vm_dir
+  when: vmware_vm_dir | length > 0
+
+- name: VMware / Ubuntu VM diagnostic
+  ansible.builtin.debug:
+    msg: "{{ _lines | select | list }}"
+  vars:
+    _loaded: "{{ _st_lsmod.stdout is search('(?m)^vmmon ') and _st_lsmod.stdout is search('(?m)^vmnet ') }}"
+    _partial: "{{ _st_lsmod.stdout is search('(?m)^(vmmon|vmnet) ') }}"
+    _lines:
+      - "Kernel:        {{ ansible_facts.kernel }}"
+      - >-
+        Secure Boot:   {{ ('enabled' in (_st_sb.stdout | default('') | lower))
+                          | ternary('ENABLED (modules must be signed)', 'disabled (signing not required)') }}
+      - >-
+        MOK key:       {{ (not _st_mok_file.stat.exists) | ternary(
+                            'missing                    -> --tags mok',
+                            ('already enrolled' in (_st_mok.stdout | default('')))
+                            | ternary('present and enrolled',
+                                      'present but NOT enrolled   -> --tags mok')) }}
+      - >-
+        Modules:       {{ _loaded | ternary('both loaded',
+                            _partial | ternary('partially loaded           -> --tags modules',
+                                               'not loaded                 -> --tags modules')) }}
+      - >-
+        vmmon:         {{ (_st_paths.results[0].rc != 0) | ternary('not built                 -> --tags modules',
+                            (_st_signed.results[0].rc == 0) | ternary('built + signed',
+                                                                      'built but UNSIGNED        -> --tags sign')) }}
+      - >-
+        vmnet:         {{ (_st_paths.results[1].rc != 0) | ternary('not built                 -> --tags modules',
+                            (_st_signed.results[1].rc == 0) | ternary('built + signed',
+                                                                      'built but UNSIGNED        -> --tags sign')) }}
+      - >-
+        /tmp:          {{ (_st_tmpfs.stdout | trim == 'tmpfs')
+                          | ternary('tmpfs (RAM-backed) — .vmem can overflow it',
+                                    'on disk (not tmpfs) — .vmem trap unlikely') }}
+      - >-
+        {{ (_st_tmpfs.stdout | trim == 'tmpfs')
+           | ternary('tmpDirectory:  ' ~ ((_st_tmpdir.stdout | default('0') | int > 0)
+                     | ternary('set (temp redirected off /tmp) — good',
+                               'NOT set                    -> --tags tmp')), '') }}
+      - >-
+        {{ ((_st_dmesg.stdout | default('0') | int) > 0)
+           | ternary('dmesg:         ' ~ _st_dmesg.stdout ~ " 'unsigned module rejected' msg(s) — signing incomplete", '') }}
+      - >-
+        {{ (_st_xscale.rc | default(1) == 0)
+           | ternary('Xwayland scale: ' ~ ((_st_xscale.stdout | float) == (vmware_xwayland_scaling_factor | float))
+                     | ternary(_st_xscale.stdout ~ ' — good',
+                               _st_xscale.stdout ~ ' (want ' ~ (vmware_xwayland_scaling_factor | float) ~ ') -> --tags scaling'), '') }}
+      - >-
+        {{ (vmware_vm_dir | length > 0 and (_st_vm_dir.stat.exists | default(false)))
+           | ternary('VM_DIR:        ' ~ vmware_vm_dir ~ ' (' ~ (_st_vm_dir.stat.pw_name | default('?')) ~ ')'
+                     ~ (((_st_vm_dir.stat.pw_name | default('')) != target_user)
+                        | ternary('  owner is not you -> --tags perms', '')), '') }}

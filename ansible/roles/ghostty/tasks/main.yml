@@ -1,0 +1,16 @@
+- name: Ensure the Ghostty config directory exists
+  ansible.builtin.file:
+    path: "{{ target_home }}/.config/ghostty"
+    state: directory
+    mode: "0755"
+  when: ghostty_config_enabled | bool
+  tags: [ghostty]
+
+- name: Deploy the Ghostty config
+  ansible.builtin.copy:
+    src: config.ghostty
+    dest: "{{ target_home }}/.config/ghostty/config.ghostty"
+    mode: "0644"
+    backup: true
+  when: ghostty_config_enabled | bool
+  tags: [ghostty]

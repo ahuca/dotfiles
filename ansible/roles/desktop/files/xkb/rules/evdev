@@ -1,0 +1,4 @@
+! include %S/evdev
+
+! option = symbols
+  custom:lsgt_on_tlde = +custom(lsgt_on_tlde)

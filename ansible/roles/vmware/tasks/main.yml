@@ -1,0 +1,42 @@
+---
+#   Secure Boot rejects unsigned vmmon/vmnet  -> --tags modules  (build+SIGN+load)
+#   .vmem "No space left on device" on tmpfs  -> --tags tmp      (temp off /tmp)
+#   "Insufficient permission" (snapshot/lock) -> --tags perms    (VM dir ownership)
+#   host eats Super/Alt+Tab etc. in the guest -> --tags keyboard (Xwayland grabs)
+#   guest mouse glitches, mixed-scale monitors -> --tags scaling (Xwayland 1x)
+#   just diagnose                             -> --tags status
+- name: Diagnose the current state
+  ansible.builtin.import_tasks: status.yml
+  tags: [status, never]
+
+- name: Install build dependencies
+  ansible.builtin.import_tasks: deps.yml
+  tags: [deps, modules, sign]
+
+- name: Generate and enroll the MOK signing key
+  ansible.builtin.import_tasks: mok.yml
+  tags: [mok, modules]
+
+- name: Build the kernel modules
+  ansible.builtin.import_tasks: build.yml
+  tags: [modules]
+
+- name: Sign and load the kernel modules
+  ansible.builtin.import_tasks: sign.yml
+  tags: [modules, sign]
+
+- name: Redirect VMware's temp directory
+  ansible.builtin.import_tasks: tmp.yml
+  tags: [tmp]
+
+- name: Fix VM directory permissions
+  ansible.builtin.import_tasks: perms.yml
+  tags: [perms]
+
+- name: Forward host hotkeys to the guest
+  ansible.builtin.import_tasks: keyboard.yml
+  tags: [keyboard]
+
+- name: Draw VMware at 1x under Xwayland
+  ansible.builtin.import_tasks: scaling.yml
+  tags: [scaling]

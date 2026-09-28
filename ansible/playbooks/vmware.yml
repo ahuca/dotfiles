@@ -1,0 +1,23 @@
+---
+#   ansible-playbook playbooks/vmware.yml -K -e vmware_vm_dir=~/vmware/win10
+#   ansible-playbook playbooks/vmware.yml -K --tags modules     # after a kernel bump
+#   ansible-playbook playbooks/vmware.yml -K --tags perms -e vmware_vm_dir=~/vmware/other
+#   ansible-playbook playbooks/vmware.yml -K --tags tmp -e vmware_tmp_dir=/data/vmware-tmp
+#   ansible-playbook playbooks/vmware.yml -K --tags status
+#   ansible-playbook playbooks/vmware.yml --tags keyboard
+#   ansible-playbook playbooks/vmware.yml --tags scaling
+- name: Set up VMware Workstation
+  hosts: workstation
+  gather_facts: true
+
+  vars_prompt:
+    - name: mok_password
+      prompt: |
+        One-time MOK enrollment password (only needed the first time, to enroll
+        the module-signing key; press Enter to skip)
+      private: true
+      confirm: true
+      default: ""
+
+  roles:
+    - role: vmware

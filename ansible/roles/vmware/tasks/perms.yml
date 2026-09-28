@@ -1,0 +1,28 @@
+---
+- name: Skip the permission fix when no VM directory was given
+  ansible.builtin.debug:
+    msg: "No vmware_vm_dir set; skipping the permission fix (pass -e vmware_vm_dir=/path/to/vm)."
+  when: not vmware_vm_dir
+
+- name: Fix ownership and write permissions on the VM directory
+  when: vmware_vm_dir | length > 0
+  block:
+    - name: Confirm the VM directory exists
+      ansible.builtin.stat:
+        path: "{{ vmware_vm_dir }}"
+      register: _vm_dir
+
+    - name: Require a real directory
+      ansible.builtin.assert:
+        that: _vm_dir.stat.exists and _vm_dir.stat.isdir
+        fail_msg: "VM directory not found: {{ vmware_vm_dir }}"
+        quiet: true
+
+    - name: Take ownership and grant write access
+      ansible.builtin.file:
+        path: "{{ vmware_vm_dir }}"
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: u+rwX
+        recurse: true
+      become: true

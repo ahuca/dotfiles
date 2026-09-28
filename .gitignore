@@ -1,0 +1,9 @@
+# Python bytecode from the vendored become plugin
+__pycache__/
+*.pyc
+
+# Ansible run artefacts
+*.retry
+
+# nohup output from local runs
+nohup.out

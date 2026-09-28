@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+# Included from ~/.gitconfig: a repo takes the identity of the SSH host its
+# remote points at. Paths are relative to this file.
+{% for profile in _git_active %}
+
+[includeIf "hasconfig:remote.*.url:git@{{ profile.host }}:**/**"]
+	path = {{ profile.name }}.gitconfig
+[includeIf "hasconfig:remote.*.url:ssh://git@{{ profile.host }}/**"]
+	path = {{ profile.name }}.gitconfig
+{% endfor %}

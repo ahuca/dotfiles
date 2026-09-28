@@ -1,0 +1,4 @@
+---
+vmware_sign_file: "/usr/src/linux-headers-{{ ansible_facts.kernel }}/scripts/sign-file"
+vmware_force_rebuild: false   # rebuild vmmon/vmnet even if they are already built
+vmware_force_sign: false      # re-sign the modules even if they already carry a signature

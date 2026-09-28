@@ -1,0 +1,38 @@
+---
+- name: Assert this is a Debian/Ubuntu (apt) system
+  ansible.builtin.assert:
+    that: ansible_facts.pkg_mgr == 'apt'
+    fail_msg: "These playbooks target Debian/Ubuntu (apt); found pkg_mgr={{ ansible_facts.pkg_mgr }}."
+    quiet: true
+
+- name: Record the dpkg architecture
+  ansible.builtin.command: dpkg --print-architecture
+  register: _dpkg_arch
+  changed_when: false
+  check_mode: false
+
+- name: Expose it as deb_architecture
+  ansible.builtin.set_fact:
+    deb_architecture: "{{ _dpkg_arch.stdout }}"
+
+- name: Create the apt keyring directory
+  ansible.builtin.file:
+    path: "{{ apt_keyring_dir }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Install base tooling
+  ansible.builtin.apt:
+    name:
+      - curl
+      - wget
+      - git
+      - gpg
+      - apt-transport-https
+      - ca-certificates
+      - lsb-release
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true

@@ -1,0 +1,112 @@
+---
+# Signs with the public key only: ssh-keygen finds the private half in the
+# Bitwarden SSH agent, so the vault must be unlocked to commit.
+# Emails, hosts and keys come from the environment or this machine, never the repo.
+- name: Read git's user.email
+  ansible.builtin.command: git config --global user.email
+  register: _git_user_email
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: git_signing_email | length == 0
+
+# Kept while the agent is locked, as are the profiles' keys.
+- name: Read git's user.signingkey
+  ansible.builtin.command: git config --global user.signingkey
+  register: _git_user_signingkey
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: git_signing_enabled | bool
+
+# Also needed for the profiles' keys, so read even when GIT_SIGNING_KEY is set.
+# Every key lives in Bitwarden; nothing is read from ~/.ssh.
+- name: List the keys in the Bitwarden SSH agent
+  ansible.builtin.command: ssh-add -L
+  environment:
+    SSH_AUTH_SOCK: "{{ bitwarden_ssh_agent_sock | replace('$HOME', target_home) }}"
+  register: _agent_keys
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# The agent key whose comment is the email, without the comment.
+- name: Resolve the signing identity
+  ansible.builtin.set_fact:
+    _signing_email: "{{ _email }}"
+    _signing_key: >-
+      {{ git_signing_key if git_signing_key | length > 0 else
+         ((_agent_keys.stdout_lines | default([])
+           | select('match', '.* ' ~ (_email | regex_escape) ~ '$')
+           | first | default('')).split(' ')[:2] | join(' '))
+         or (_git_user_signingkey.stdout | default('') | regex_replace('^key::', '')) }}
+  vars:
+    _email: "{{ git_signing_email if git_signing_email | length > 0 else (_git_user_email.stdout | default('')) }}"
+  when: git_signing_enabled | bool
+
+- name: Configure per-remote identities
+  ansible.builtin.import_tasks: profiles.yml
+  when: git_profiles_enabled | bool
+
+# Every identity git may commit as: the global one and each profile's.
+- name: Collect the signing identities
+  ansible.builtin.set_fact:
+    _signers: >-
+      {{ _ids | map(attribute='email') | zip(_ids | map(attribute='key'))
+         | map('join', ' ') | unique | list }}
+  vars:
+    _ids: >-
+      {{ ([{'email': _signing_email, 'key': _signing_key}] + (_git_active | default([])))
+         | selectattr('email') | selectattr('key') | list }}
+  when: git_signing_enabled | bool
+
+- name: Note that commit signing is being skipped
+  ansible.builtin.debug:
+    msg: >-
+      Skipping commit signing: no signing key found. Set git's user.email and
+      unlock Bitwarden with a matching SSH key (its comment must be that
+      email), or set GIT_SIGNING_EMAIL / GIT_SIGNING_KEY.
+  when:
+    - git_signing_enabled | bool
+    - _signers | length == 0
+
+- name: Configure SSH commit signing
+  when:
+    - git_signing_enabled | bool
+    - _signers | length > 0
+  block:
+    - name: Ensure the git config directory exists
+      ansible.builtin.file:
+        path: "{{ git_config_dir }}"
+        state: directory
+        mode: "0755"
+
+    # Lets `git log --show-signature` / `git verify-commit` check SSH signatures.
+    - name: Write the allowed signers file
+      ansible.builtin.template:
+        src: allowed_signers.j2
+        dest: "{{ git_allowed_signers_file }}"
+        mode: "0644"
+
+    - name: Sign commits and tags with SSH keys
+      community.general.git_config:
+        scope: global
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+      loop:
+        - { name: gpg.format, value: ssh }
+        - { name: gpg.ssh.allowedSignersFile, value: "{{ git_allowed_signers_file }}" }
+        - { name: commit.gpgsign, value: "true" }
+        - { name: tag.gpgsign, value: "true" }
+      loop_control:
+        label: "{{ item.name }}"
+
+    # The profiles override this for their own remotes.
+    - name: Sign with the Bitwarden key matching the global user.email
+      community.general.git_config:
+        scope: global
+        name: user.signingkey
+        value: "key::{{ _signing_key }}"
+      when:
+        - _signing_email | length > 0
+        - _signing_key | length > 0

@@ -1,0 +1,19 @@
+---
+- name: Check whether vmmon/vmnet are already built
+  ansible.builtin.command: modinfo -n {{ item }}
+  register: _mod_paths
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  loop: [vmmon, vmnet]
+
+# Its "Virtual machine monitor ... failed" is expected: the modules are unsigned
+# until sign.yml.
+- name: Build vmmon/vmnet
+  ansible.builtin.command: vmware-modconfig --console --install-all
+  become: true
+  register: _modconfig
+  changed_when: true
+  failed_when: false
+  when: _mod_paths.results | rejectattr('rc', 'equalto', 0) | list | length > 0
+        or (vmware_force_rebuild | bool)

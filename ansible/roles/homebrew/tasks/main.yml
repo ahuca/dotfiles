@@ -1,0 +1,61 @@
+---
+- name: Install Homebrew (Linuxbrew) and its packages
+  when: homebrew_enabled | bool
+  block:
+    - name: Install Homebrew's build prerequisites
+      ansible.builtin.apt:
+        name: [build-essential, procps, file, git]
+        state: present
+      become: true
+
+    # The official installer calls sudo itself, which fails without a tty.
+    - name: Create the Homebrew prefix owned by {{ target_user }}
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0755"
+      loop:
+        - "{{ homebrew_prefix | dirname }}"
+        - "{{ homebrew_prefix }}"
+        - "{{ homebrew_prefix }}/bin"
+      become: true
+
+    - name: Clone Homebrew
+      ansible.builtin.git:
+        repo: https://github.com/Homebrew/brew
+        dest: "{{ homebrew_prefix }}/Homebrew"
+        version: master
+        depth: 1
+        update: false
+      register: _brew_clone
+
+    - name: Link brew onto the prefix's bin
+      ansible.builtin.file:
+        src: ../Homebrew/bin/brew
+        dest: "{{ homebrew_prefix }}/bin/brew"
+        state: link
+
+    - name: Prime the Homebrew cache
+      ansible.builtin.command: "{{ homebrew_prefix }}/bin/brew update --force --quiet"
+      when: _brew_clone.changed
+      changed_when: true
+
+    - name: Load brew into future zsh and bash sessions
+      ansible.builtin.blockinfile:
+        path: "{{ target_home }}/{{ item }}"
+        create: true
+        mode: "0644"
+        marker: "# {mark} ANSIBLE MANAGED — homebrew shellenv"
+        block: |
+          eval "$({{ homebrew_prefix }}/bin/brew shellenv)"
+      loop:
+        - .zshrc
+        - .bashrc
+
+    - name: Install Homebrew packages
+      community.general.homebrew:
+        name: "{{ homebrew_packages }}"
+        state: present
+        path: "{{ homebrew_prefix }}/bin"

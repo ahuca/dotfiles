@@ -1,0 +1,80 @@
+---
+# Not `dracut --regenerate-all`: it aborts on half-removed kernels.
+- name: Find kernels with a real module tree
+  ansible.builtin.find:
+    paths: /lib/modules
+    patterns: ["modules.dep", "modules.dep.bin"]
+    file_type: file
+    recurse: true
+    depth: 2
+  register: _module_trees
+  become: true
+
+- name: Collect the kernel versions worth rebuilding
+  ansible.builtin.set_fact:
+    rebuild_kernels: "{{ _module_trees.files | map(attribute='path') | map('dirname') | map('basename') | unique | sort }}"
+
+- name: Require at least one usable kernel
+  ansible.builtin.assert:
+    that: rebuild_kernels | length > 0
+    fail_msg: "No kernel with a module tree found under /lib/modules. Boot config unchanged; passphrase still works."
+    quiet: true
+
+- name: Rebuild the initramfs for each kernel
+  ansible.builtin.command:
+    cmd: "{{ (initrd_sys == 'dracut')
+             | ternary('dracut -f /boot/initrd.img-' ~ item ~ ' ' ~ item,
+                       'update-initramfs -u -k ' ~ item) }}"
+  loop: "{{ rebuild_kernels }}"
+  register: _rebuilds
+  failed_when: false
+  changed_when: _rebuilds.rc == 0
+  become: true
+
+- name: Require at least one initramfs image to have been generated
+  ansible.builtin.assert:
+    that: _rebuilds.results | selectattr('rc', 'equalto', 0) | list | length > 0
+    fail_msg: "No initramfs image was generated. Boot config unchanged; passphrase still works."
+    quiet: true
+
+- name: Report any kernel that failed to rebuild
+  ansible.builtin.debug:
+    msg: "{{ initrd_sys }} failed for {{ item.item }} (continuing)"
+  loop: "{{ _rebuilds.results | rejectattr('rc', 'equalto', 0) | list }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Look for clevis inside the running kernel's initrd
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      {{ (initrd_sys == 'dracut') | ternary('lsinitrd', 'lsinitramfs') }} /boot/initrd.img-{{ ansible_facts.kernel }} 2>/dev/null | grep -q clevis
+    executable: /bin/bash
+  register: _initrd_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  become: true
+
+- name: Report the initrd check
+  ansible.builtin.debug:
+    msg: "{{ (_initrd_check.rc == 0) | ternary(
+             'clevis + crypt support confirmed inside /boot/initrd.img-' ~ ansible_facts.kernel,
+             'Could not confirm clevis inside /boot/initrd.img-' ~ ansible_facts.kernel ~ ' — the reboot test is the real check.') }}"
+
+- name: Show the current LUKS/clevis bindings
+  ansible.builtin.command: clevis luks list -d {{ luks_device }}
+  register: _final_bindings
+  changed_when: false
+  check_mode: false
+  become: true
+
+- name: Summary
+  ansible.builtin.debug:
+    msg: "{{ ([''] + _final_bindings.stdout_lines + ['', 'Next steps:'] + _next_steps) }}"
+  vars:
+    _next_steps:
+      - "1. Reboot. The passphrase prompt may flash for a moment, then clevis answers it from the TPM and boot continues automatically. That flash is normal."
+      - "2. Keep your passphrase in your password manager — it's still the fallback (slot 0)."
+      - "3. After a BIOS/firmware or Secure Boot change, boot will ask for the passphrase again. Type it to boot, then re-run this playbook with -e tpm_rebind=true."
+      - "4. Recommended: set a BIOS supervisor password (F2 -> Security) so nobody can boot a USB stick to release the key via PCR7."

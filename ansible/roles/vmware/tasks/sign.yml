@@ -1,0 +1,97 @@
+---
+- name: Locate sign-file
+  ansible.builtin.stat:
+    path: "{{ vmware_sign_file }}"
+  register: _sign_file
+
+- name: Require sign-file
+  ansible.builtin.assert:
+    that: _sign_file.stat.exists and _sign_file.stat.executable
+    fail_msg: "sign-file missing at {{ vmware_sign_file }} — install linux-headers-{{ ansible_facts.kernel }}"
+    quiet: true
+
+- name: Confirm the MOK key is enrolled
+  ansible.builtin.command: mokutil --test-key {{ vmware_mok_dir }}/MOK.der
+  register: _mok_test_sign
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  become: true
+
+- name: Require an enrolled MOK key
+  ansible.builtin.assert:
+    that: "'already enrolled' in _mok_test_sign.stdout"
+    fail_msg: "MOK key not enrolled. Run: ansible-playbook playbooks/vmware.yml --tags mok"
+    quiet: true
+
+- name: Locate the built modules
+  ansible.builtin.command: modinfo -n {{ item }}
+  register: _module_paths
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  loop: [vmmon, vmnet]
+
+- name: Require both modules to be built
+  ansible.builtin.assert:
+    that: _module_paths.results | rejectattr('rc', 'equalto', 0) | list | length == 0
+    fail_msg: "vmmon/vmnet not built. Run: ansible-playbook playbooks/vmware.yml --tags modules"
+    quiet: true
+
+# sign-file cannot sign a compressed module in place.
+- name: Reject compressed modules
+  ansible.builtin.assert:
+    that: _module_paths.results | map(attribute='stdout') | select('search', '\.(zst|gz|xz)$') | list | length == 0
+    fail_msg: >-
+      A module is compressed ({{ _module_paths.results | map(attribute='stdout') | join(', ') }});
+      sign-file can't sign it in place. Decompress -> sign -> recompress.
+    quiet: true
+
+- name: Check which modules already carry a signature
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      modinfo {{ item }} 2>/dev/null | grep -qi '^signer'
+    executable: /bin/bash
+  register: _mod_signed
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  loop: [vmmon, vmnet]
+
+- name: Sign the modules
+  ansible.builtin.command:
+    cmd: >-
+      {{ vmware_sign_file }} sha256
+      {{ vmware_mok_dir }}/MOK.priv {{ vmware_mok_dir }}/MOK.der
+      {{ _module_paths.results | selectattr('item', 'equalto', item.item) | map(attribute='stdout') | first }}
+  become: true
+  loop: "{{ _mod_signed.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.rc != 0 or (vmware_force_sign | bool)
+
+- name: Load the modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  become: true
+  loop: [vmmon, vmnet]
+
+# Running `vmware-modconfig --install-all` after this undoes the signing.
+- name: Confirm both modules are loaded
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      lsmod | grep -q '^vmmon ' && lsmod | grep -q '^vmnet '
+    executable: /bin/bash
+  register: _lsmod_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  become: true
+
+- name: Fail with a pointer at the kernel log
+  ansible.builtin.fail:
+    msg: "Modules not loaded. Check: sudo dmesg | grep -iE 'vmmon|vmnet|rejected' | tail"
+  when: _lsmod_check.rc != 0
