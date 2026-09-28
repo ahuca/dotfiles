@@ -15,3 +15,9 @@ Resolve such values at runtime instead, following the existing pattern:
 
 When a value can't be found, the role skips with a pointer rather than failing.
 Before committing, grep the diff for anything that looks personal.
+
+## Conventional Commits
+
+Commit subjects follow [Conventional Commits](https://www.conventionalcommits.org/)
+with the Ansible role (or area) as scope: `feat(git): ...`, `fix(vmware): ...`.
+Pick the type by the change — `feat`, `fix`, `docs`, `refactor`, `chore`.
