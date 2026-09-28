@@ -1,0 +1,63 @@
+---
+# Host -> guest copy/paste under GNOME Wayland.
+#
+# mutter's Xwayland clipboard bridge lists a TIMESTAMP target but never serves
+# it (`xclip -o -selection clipboard -t TIMESTAMP` fails after a copy in a
+# Wayland app). VMware only sends the host clipboard to the guest when that
+# timestamp changes, so nothing copied on the host arrives; guest -> host still
+# works. While VMware runs, a small user service re-owns each such clipboard as
+# an X11 client that serves TIMESTAMP, keeping every format (text, HTML, PNG).
+# In mutter's src/x11/meta-x11-selection.c the TARGETS reply appends TIMESTAMP,
+# but the request handler only answers TARGETS and DELETE. Upstream:
+# https://gitlab.gnome.org/GNOME/mutter/-/work_items/1265 (drop this once
+# fixed). Off-the-shelf Wayland<->X11 clipboard syncers need wlr/ext-data-control,
+# which mutter does not implement.
+- name: Check for PyGObject with GTK 3
+  ansible.builtin.command: python3 -c 'import gi; gi.require_version("Gtk", "3.0"); gi.require_version("GdkX11", "3.0")'
+  register: _clip_gi
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Install the clipboard bridge
+  when: _clip_gi.rc == 0
+  block:
+    - name: Ensure the bin and systemd user unit directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ target_home }}/.local/bin"
+        - "{{ target_home }}/.config/systemd/user"
+
+    - name: Deploy the bridge script
+      ansible.builtin.copy:
+        src: vmware-clipboard-bridge
+        dest: "{{ target_home }}/.local/bin/vmware-clipboard-bridge"
+        mode: "0755"
+      register: _clip_script
+
+    - name: Deploy the bridge user unit
+      ansible.builtin.copy:
+        src: vmware-clipboard-bridge.service
+        dest: "{{ target_home }}/.config/systemd/user/vmware-clipboard-bridge.service"
+        mode: "0644"
+      register: _clip_unit
+
+    - name: Enable and (re)start the bridge
+      ansible.builtin.systemd_service:
+        name: vmware-clipboard-bridge.service
+        scope: user
+        enabled: true
+        state: "{{ (_clip_script.changed or _clip_unit.changed) | ternary('restarted', 'started') }}"
+        daemon_reload: "{{ _clip_unit.changed }}"
+      when: ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
+
+- name: Note the skipped clipboard bridge
+  ansible.builtin.debug:
+    msg: >-
+      {{ (_clip_gi.rc != 0) | ternary(
+           'PyGObject with GTK 3 is missing — install python3-gi and gir1.2-gtk-3.0, then re-run --tags clipboard',
+           'No D-Bus session bus — the bridge is installed and starts at next login; to start it now, re-run from your desktop session with --tags clipboard') }}
+  when: _clip_gi.rc != 0 or ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is not defined

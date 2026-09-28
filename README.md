@@ -13,7 +13,7 @@ ansible/
   playbooks/
     workstation.yml   everyday setup: repos, packages, desktop, shell, node, brew
     tpm-unlock.yml    bind the LUKS root volume to the TPM2 (clevis)
-    vmware.yml        VMware Workstation modules, MOK signing, temp dir, perms, hotkeys, scaling
+    vmware.yml        VMware Workstation modules, MOK signing, temp dir, perms, hotkeys, scaling, clipboard
   roles/              one role per concern
 ```
 
@@ -214,6 +214,7 @@ ansible-playbook playbooks/vmware.yml -K --tags perms -e vmware_vm_dir=~/vmware/
 ansible-playbook playbooks/vmware.yml -K --tags status                    # diagnose only
 ansible-playbook playbooks/vmware.yml --tags keyboard                     # forward host hotkeys to the guest
 ansible-playbook playbooks/vmware.yml --tags scaling                      # draw VMware at 1x under Xwayland
+ansible-playbook playbooks/vmware.yml --tags clipboard                    # host -> guest copy/paste on Wayland
 ```
 
 Which tag fixes what:
@@ -225,11 +226,20 @@ Which tag fixes what:
 | "Insufficient permission" (snapshot/lock)     | `perms`   |
 | Host eats Super / Alt+Tab instead of the guest | `keyboard` |
 | Guest mouse glitches with mixed-scale monitors | `scaling` |
+| Host → guest copy/paste does nothing (guest → host works) | `clipboard` |
 
 MOK enrollment cannot be fully automated — it needs the blue **MOK Management**
 screen at boot. The playbook queues the request and stops; reboot, choose
 *Enroll MOK → Continue → Yes*, enter the password, reboot, then re-run with
 `--tags modules`. That screen uses a US QWERTY layout and hides what you type.
+
+The `clipboard` tag installs a user service, `vmware-clipboard-bridge`. GNOME's
+Xwayland clipboard bridge never serves the `TIMESTAMP` target, and VMware only
+sends the host clipboard when that timestamp changes, so nothing copied in a
+Wayland app reaches the guest ([mutter#1265](https://gitlab.gnome.org/GNOME/mutter/-/work_items/1265)).
+While VMware runs, the service re-owns each such clipboard as an X11 client that
+does serve it. Ready-made Wayland⇄X11 clipboard syncers don't work here: they
+need a data-control protocol that mutter doesn't implement.
 
 Never run `vmware-modconfig --install-all` after signing — it rebuilds the
 modules unsigned and silently undoes the signing.

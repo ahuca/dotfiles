@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+# Managed by Ansible (roles/vmware).
+"""Hand Wayland clipboard contents to VMware through a real X11 owner.
+
+GNOME's Xwayland clipboard bridge lists a TIMESTAMP target but never serves
+it. VMware only sends the host clipboard to the guest when that timestamp
+changes, so text copied in a Wayland app never reaches the guest (guest to
+host still works). While VMware runs, this takes each such clipboard over
+as an X11 owner that serves TIMESTAMP; mutter mirrors it back to Wayland.
+https://gitlab.gnome.org/GNOME/mutter/-/work_items/1265
+"""
+import os
+
+os.environ["GDK_BACKEND"] = "x11"  # an X11 client is the whole point
+
+import gi  # noqa: E402
+
+gi.require_version("Gdk", "3.0")
+gi.require_version("GdkX11", "3.0")
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gdk, GdkX11, GLib, Gtk  # noqa: E402
+
+CLIPBOARD = Gdk.SELECTION_CLIPBOARD
+TIMESTAMP = Gdk.Atom.intern("TIMESTAMP", False)
+TARGETS = Gdk.Atom.intern("TARGETS", False)
+# Served by GTK itself, or not data at all.
+META = {"TIMESTAMP", "TARGETS", "MULTIPLE", "SAVE_TARGETS", "DELETE",
+        "INSERT_SELECTION", "INSERT_PROPERTY"}
+
+
+def vmware_running():
+    for pid in os.listdir("/proc"):
+        try:
+            with open(f"/proc/{pid}/comm") as f:
+                if f.read().strip() == "vmware":
+                    return True
+        except OSError:
+            pass
+    return False
+
+
+def content_targets(atoms):
+    # mutter can list a target twice.
+    names = list(dict.fromkeys(a.name() for a in atoms if a.name() not in META))
+    # Every image type is a conversion of one image; keep only one of them.
+    images = [n for n in names if n.startswith("image/")]
+    keep = "image/png" if "image/png" in images else images[:1]
+    return [n for n in names if not n.startswith("image/") or n in keep]
+
+
+class Bridge:
+    def __init__(self):
+        self.widget = Gtk.Invisible()
+        # Needed for the server timestamp that TIMESTAMP answers with.
+        self.widget.add_events(Gdk.EventMask.PROPERTY_CHANGE_MASK)
+        self.widget.realize()
+        self.widget.connect("selection-get", self.on_get)
+        self.served = []  # (type atom, format, bytes) per target info
+        self.gen = 0
+        self.had_vmware = False
+        self.clipboard = Gtk.Clipboard.get(CLIPBOARD)
+        self.clipboard.connect("owner-change", lambda *_: self.check())
+        GLib.timeout_add_seconds(5, self.poll_vmware)
+
+    def poll_vmware(self):
+        # Also bridge what was copied before VMware started.
+        running = vmware_running()
+        if running and not self.had_vmware:
+            self.check()
+        self.had_vmware = running
+        return True
+
+    def ours(self):
+        return Gdk.selection_owner_get(CLIPBOARD) == self.widget.get_window()
+
+    def check(self):
+        self.gen += 1
+        if self.ours() or not vmware_running():
+            return
+        self.clipboard.request_contents(TIMESTAMP, self.on_timestamp, self.gen)
+
+    def on_timestamp(self, _cb, sd, gen):
+        # A real X11 owner (VMware itself, an X11 app) answers; leave it be.
+        if gen == self.gen and sd.get_length() < 0:
+            self.clipboard.request_contents(TARGETS, self.on_targets, gen)
+
+    def on_targets(self, _cb, sd, gen):
+        ok, atoms = sd.get_targets()
+        if gen != self.gen or not ok:
+            return
+        names = content_targets(atoms)
+        got = {}
+        for name in names:
+            self.clipboard.request_contents(
+                Gdk.Atom.intern(name, False), self.on_data, (gen, name, names, got))
+
+    def on_data(self, _cb, sd, args):
+        gen, name, names, got = args
+        if gen != self.gen:
+            return
+        # sd is freed when this returns; keep a copy.
+        got[name] = (sd.get_data_type(), sd.get_format(), sd.get_data()) \
+            if sd.get_length() >= 0 else None
+        if len(got) == len(names):
+            self.claim([(n, got[n]) for n in names if got[n]])
+
+    def claim(self, items):
+        if not items:
+            return
+        Gtk.selection_clear_targets(self.widget, CLIPBOARD)
+        self.served = []
+        for info, (name, data) in enumerate(items):
+            Gtk.selection_add_target(self.widget, CLIPBOARD, Gdk.Atom.intern(name, False), info)
+            self.served.append(data)
+        time = GdkX11.x11_get_server_time(self.widget.get_window())
+        Gtk.selection_owner_set(self.widget, CLIPBOARD, time)
+
+    def on_get(self, _widget, sd, info, _time):
+        if info < len(self.served):
+            sd.set(*self.served[info])
+
+
+if __name__ == "__main__":
+    Bridge()
+    Gtk.main()

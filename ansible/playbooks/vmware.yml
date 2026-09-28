@@ -6,6 +6,7 @@
 #   ansible-playbook playbooks/vmware.yml -K --tags status
 #   ansible-playbook playbooks/vmware.yml --tags keyboard
 #   ansible-playbook playbooks/vmware.yml --tags scaling
+#   ansible-playbook playbooks/vmware.yml --tags clipboard
 - name: Set up VMware Workstation
   hosts: workstation
   gather_facts: true

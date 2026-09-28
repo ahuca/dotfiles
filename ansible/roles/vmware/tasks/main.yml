@@ -4,6 +4,7 @@
 #   "Insufficient permission" (snapshot/lock) -> --tags perms    (VM dir ownership)
 #   host eats Super/Alt+Tab etc. in the guest -> --tags keyboard (Xwayland grabs)
 #   guest mouse glitches, mixed-scale monitors -> --tags scaling (Xwayland 1x)
+#   host -> guest copy/paste does nothing      -> --tags clipboard (TIMESTAMP)
 #   just diagnose                             -> --tags status
 - name: Diagnose the current state
   ansible.builtin.import_tasks: status.yml
@@ -40,3 +41,7 @@
 - name: Draw VMware at 1x under Xwayland
   ansible.builtin.import_tasks: scaling.yml
   tags: [scaling]
+
+- name: Pass the Wayland clipboard to VMware
+  ansible.builtin.import_tasks: clipboard.yml
+  tags: [clipboard]

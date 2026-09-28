@@ -1,0 +1,13 @@
+# Managed by Ansible (roles/vmware).
+[Unit]
+Description=Pass Wayland clipboard contents to VMware guests
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/vmware-clipboard-bridge
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

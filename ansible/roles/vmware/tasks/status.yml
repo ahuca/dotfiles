@@ -82,6 +82,14 @@
   failed_when: false
   when: ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
 
+- name: Check the clipboard bridge
+  ansible.builtin.command: systemctl --user is-active vmware-clipboard-bridge.service
+  register: _st_clip
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
+
 - name: Stat the VM directory
   ansible.builtin.stat:
     path: "{{ vmware_vm_dir }}"
@@ -134,6 +142,11 @@
            | ternary('Xwayland scale: ' ~ ((_st_xscale.stdout | float) == (vmware_xwayland_scaling_factor | float))
                      | ternary(_st_xscale.stdout ~ ' — good',
                                _st_xscale.stdout ~ ' (want ' ~ (vmware_xwayland_scaling_factor | float) ~ ') -> --tags scaling'), '') }}
+      - >-
+        {{ (_st_clip.stdout is defined)
+           | ternary('Clipboard:     ' ~ ((_st_clip.stdout | trim) == 'active')
+                     | ternary('bridge running (host -> guest copy/paste)',
+                               'bridge ' ~ (_st_clip.stdout | trim) ~ '            -> --tags clipboard'), '') }}
       - >-
         {{ (vmware_vm_dir | length > 0 and (_st_vm_dir.stat.exists | default(false)))
            | ternary('VM_DIR:        ' ~ vmware_vm_dir ~ ' (' ~ (_st_vm_dir.stat.pw_name | default('?')) ~ ')'
