@@ -57,9 +57,10 @@ class Bridge:
         self.widget.connect("selection-get", self.on_get)
         self.served = []  # (type atom, format, bytes) per target info
         self.gen = 0
+        self.owner_time = 0  # when the current owner took the clipboard
         self.had_vmware = False
         self.clipboard = Gtk.Clipboard.get(CLIPBOARD)
-        self.clipboard.connect("owner-change", lambda *_: self.check())
+        self.clipboard.connect("owner-change", self.on_owner_change)
         GLib.timeout_add_seconds(5, self.poll_vmware)
 
     def poll_vmware(self):
@@ -69,6 +70,10 @@ class Bridge:
             self.check()
         self.had_vmware = running
         return True
+
+    def on_owner_change(self, _cb, event):
+        self.owner_time = event.selection_time
+        self.check()
 
     def ours(self):
         return Gdk.selection_owner_get(CLIPBOARD) == self.widget.get_window()
@@ -88,21 +93,27 @@ class Bridge:
         ok, atoms = sd.get_targets()
         if gen != self.gen or not ok:
             return
-        names = content_targets(atoms)
-        got = {}
-        for name in names:
-            self.clipboard.request_contents(
-                Gdk.Atom.intern(name, False), self.on_data, (gen, name, names, got))
+        self.fetch(gen, content_targets(atoms), [])
+
+    def fetch(self, gen, names, items):
+        # One request at a time: some owners (Bitwarden's) answer only the
+        # last of several concurrent requests.
+        if len(items) == len(names):
+            self.claim(items)
+            return
+        name = names[len(items)]
+        self.clipboard.request_contents(
+            Gdk.Atom.intern(name, False), self.on_data, (gen, names, items))
 
     def on_data(self, _cb, sd, args):
-        gen, name, names, got = args
-        if gen != self.gen:
+        gen, names, items = args
+        # Owner changed, or a format failed: leave it be rather than
+        # replace it with part of its contents.
+        if gen != self.gen or sd.get_length() < 0:
             return
         # sd is freed when this returns; keep a copy.
-        got[name] = (sd.get_data_type(), sd.get_format(), sd.get_data()) \
-            if sd.get_length() >= 0 else None
-        if len(got) == len(names):
-            self.claim([(n, got[n]) for n in names if got[n]])
+        items.append((names[len(items)], (sd.get_data_type(), sd.get_format(), sd.get_data())))
+        self.fetch(gen, names, items)
 
     def claim(self, items):
         if not items:
@@ -112,7 +123,10 @@ class Bridge:
         for info, (name, data) in enumerate(items):
             Gtk.selection_add_target(self.widget, CLIPBOARD, Gdk.Atom.intern(name, False), info)
             self.served.append(data)
-        time = GdkX11.x11_get_server_time(self.widget.get_window())
+        # Claim as of when the copied owner took over: the X server then
+        # ignores the claim if anything was copied since, even a copy whose
+        # owner-change hasn't reached us yet.
+        time = self.owner_time or GdkX11.x11_get_server_time(self.widget.get_window())
         Gtk.selection_owner_set(self.widget, CLIPBOARD, time)
 
     def on_get(self, _widget, sd, info, _time):

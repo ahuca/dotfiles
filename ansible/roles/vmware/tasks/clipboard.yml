@@ -7,6 +7,8 @@
 # timestamp changes, so nothing copied on the host arrives; guest -> host still
 # works. While VMware runs, a small user service re-owns each such clipboard as
 # an X11 client that serves TIMESTAMP, keeping every format (text, HTML, PNG).
+# X11 owners without TIMESTAMP are re-owned too (Bitwarden's), so formats are
+# fetched one at a time and a clipboard with any failed format is left alone.
 # In mutter's src/x11/meta-x11-selection.c the TARGETS reply appends TIMESTAMP,
 # but the request handler only answers TARGETS and DELETE. Upstream:
 # https://gitlab.gnome.org/GNOME/mutter/-/work_items/1265 (drop this once
