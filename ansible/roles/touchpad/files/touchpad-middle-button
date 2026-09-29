@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+# Managed by Ansible (roles/touchpad).
+"""Forward the touchpad's physical middle button, which the kernel drops.
+
+The ASUS ProArt Studiobook touchpad (Elan 04F3:31AF) sends its middle button
+in HID report 0x60, one of two Mouse collections that hid-input merges into a
+single input device. The other one (report 0x01, never sent) claims
+BTN_LEFT/RIGHT/MIDDLE first, so report 0x60's buttons are dropped as
+duplicates. This reads report 0x60 from hidraw and presses BTN_MIDDLE on a
+virtual mouse. Left and right already arrive through the touchpad report.
+"""
+import os
+import sys
+
+from evdev import UInput, ecodes as e
+
+REPORT_ID = 0x60
+MIDDLE = 0x04  # Button 3, in the byte after the report ID
+
+
+def main():
+    fd = os.open(sys.argv[1], os.O_RDONLY)
+    # REL_X/Y and left/right make udev and libinput treat it as a mouse; only
+    # the middle button is ever sent.
+    caps = {e.EV_KEY: [e.BTN_LEFT, e.BTN_RIGHT, e.BTN_MIDDLE],
+            e.EV_REL: [e.REL_X, e.REL_Y]}
+    with UInput(caps, name="Touchpad middle button") as ui:
+        pressed = False
+        # hidraw hands over one report per read.
+        while report := os.read(fd, 256):
+            if len(report) < 2 or report[0] != REPORT_ID:
+                continue
+            down = bool(report[1] & MIDDLE)
+            if down != pressed:
+                ui.write(e.EV_KEY, e.BTN_MIDDLE, int(down))
+                ui.syn()
+                pressed = down
+
+
+if __name__ == "__main__":
+    main()

@@ -124,6 +124,11 @@ wm_toggle_above_bindings: ["<Super><Control>t"]
 # Put < > | on the key left of 1, for keyboards without the key left of Z.
 xkb_lsgt_on_tlde: false
 
+# ── touchpad ────────────────────────────────────────────────────────
+# Forward the ASUS ProArt Studiobook touchpad's middle button, which the kernel
+# drops. Skips itself on machines without that touchpad.
+touchpad_middle_button_enabled: true
+
 # ── ghostty ─────────────────────────────────────────────────────────
 ghostty_config_enabled: true
 

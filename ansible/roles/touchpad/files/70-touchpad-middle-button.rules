@@ -1,0 +1,3 @@
+# Managed by Ansible (roles/touchpad).
+# ASUS ProArt Studiobook touchpad: forward the middle button the kernel drops.
+SUBSYSTEM=="hidraw", KERNELS=="0018:04F3:31AF.*", TAG+="systemd", ENV{SYSTEMD_WANTS}+="touchpad-middle-button@%k.service"

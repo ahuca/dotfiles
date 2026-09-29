@@ -72,6 +72,7 @@ ansible-playbook site.yml -K --tags packages # just the package installs
 ansible-playbook site.yml -K --tags copyq    # just the CopyQ hotkey
 ansible-playbook site.yml -K --tags ghostty  # just the Ghostty config
 ansible-playbook site.yml -K --tags kdeconnect  # just the KDE Connect ufw rule
+ansible-playbook site.yml -K --tags touchpad  # just the touchpad middle-button fix
 ansible-playbook site.yml --tags zsh_plugins  # just the oh-my-zsh plugins
 ansible-playbook site.yml -K --tags docker   # just Docker Engine (and its repo)
 ansible-playbook site.yml -K --tags git      # just git signing + profiles (unlock Bitwarden first)
@@ -93,6 +94,7 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 | `packages` | apt packages (incl. KDE Connect + its ufw ports), snaps (Bitwarden, PowerShell), D2, UniFi Identity Desktop |
 | `docker`   | Docker's apt repo + Docker Engine, Buildx, Compose; you in the `docker` group |
 | `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); opt-in `< > \|` on the key left of 1 (`xkb_lsgt_on_tlde`) |
+| `touchpad` | ASUS ProArt Studiobook touchpad: a root service that forwards the physical middle button the kernel drops (only where that touchpad is present; see below) |
 | `ghostty`  | Ghostty config (`roles/ghostty/files/config.ghostty`, Windows Terminal-style keys; F11 fullscreen, Ctrl+Enter left to apps such as Claude Code) |
 | `shell`    | zsh + oh-my-zsh (plugins: git, z, fzf, fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting), PowerShell-style grey history suggestions, login shell, Bitwarden SSH-agent socket |
 | `git`      | SSH commit/tag signing with the Bitwarden agent key matching `user.email` (looked up per commit), allowed signers file; per-remote `user.email` profiles (`git_profiles`) with matching `~/.ssh/config` hosts |
@@ -144,6 +146,16 @@ leaves Docker out entirely. Docker Desktop for Linux runs
 containers inside a KVM VM; Engine runs them as ordinary host processes, so it
 costs VMware guests nothing. Two things to know: membership of the `docker`
 group is root-equivalent, and ports you publish with `-p` bypass ufw.
+
+**Touchpad middle button.** On the ASUS ProArt Studiobook's three-button
+touchpad (Elan `04F3:31AF`), the physical middle button does nothing: the
+hardware sends it, but in a second Mouse collection whose buttons the kernel
+drops as duplicates of the first one's. `libinput debug-events` (from `libinput-tools`)
+shows no `BTN_MIDDLE`, and `/sys/kernel/debug/hid/<dev>/rdesc` shows that
+collection's buttons mapped to `Sync.Report`. The `touchpad` role installs
+`touchpad-middle-button@hidrawN.service`, started by a udev rule, which reads
+the button from hidraw and presses it on a virtual mouse. Remove it once the
+kernel maps the button itself.
 
 ### After the run
 

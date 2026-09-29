@@ -1,0 +1,85 @@
+---
+# ASUS ProArt Studiobook three-button touchpad (Elan 04F3:31AF): the physical
+# middle button does nothing. It arrives in HID report 0x60, the second of two
+# Mouse collections, which hid-input merges into one input device. The first
+# (report 0x01, never sent) claims BTN_LEFT/RIGHT/MIDDLE, so 0x60's buttons
+# are dropped as duplicates (drivers/hid/hid-input.c, HID_STAT_DUP_DETECTED);
+# `/sys/kernel/debug/hid/<dev>/rdesc` shows them mapped to "Sync.Report". A
+# root service reads 0x60 from hidraw and presses BTN_MIDDLE on a uinput
+# mouse. Drop this once the kernel maps the button itself.
+- name: Look for the affected touchpad
+  ansible.builtin.find:
+    paths: /sys/bus/hid/devices
+    patterns: "0018:04F3:31AF.*"
+    file_type: any
+  register: _tp_hid
+  when: touchpad_middle_button_enabled | bool
+
+- name: Install the middle-button bridge
+  when:
+    - touchpad_middle_button_enabled | bool
+    - _tp_hid.matched > 0
+  become: true
+  block:
+    - name: Install python-evdev
+      ansible.builtin.apt:
+        name: python3-evdev
+        state: present
+
+    - name: Deploy the bridge script
+      ansible.builtin.copy:
+        src: touchpad-middle-button
+        dest: /usr/local/libexec/touchpad-middle-button
+        mode: "0755"
+      register: _tp_script
+
+    - name: Deploy the bridge unit
+      ansible.builtin.copy:
+        src: touchpad-middle-button@.service
+        dest: /etc/systemd/system/touchpad-middle-button@.service
+        mode: "0644"
+      register: _tp_unit
+
+    - name: Deploy the udev rule that starts it
+      ansible.builtin.copy:
+        src: 70-touchpad-middle-button.rules
+        dest: /etc/udev/rules.d/70-touchpad-middle-button.rules
+        mode: "0644"
+      register: _tp_rule
+
+    - name: Find the touchpad's hidraw nodes
+      ansible.builtin.find:
+        paths: "{{ _tp_hid.files | map(attribute='path') | map('regex_replace', '$', '/hidraw') | list }}"
+        patterns: "hidraw*"
+        file_type: directory
+      register: _tp_hidraw
+
+    - name: Name the hidraw nodes
+      ansible.builtin.set_fact:
+        _tp_nodes: "{{ _tp_hidraw.files | map(attribute='path') | map('basename') | list }}"
+
+    - name: Reload systemd units
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+      when: _tp_unit.changed
+
+    # Replays "add" so systemd picks up the tag and starts the service now.
+    - name: Apply the udev rule to the running touchpad
+      ansible.builtin.shell: |
+        udevadm control --reload
+        udevadm trigger --settle --action=add {{ _tp_nodes | map('regex_replace', '^', '/dev/') | join(' ') }}
+      when: _tp_rule.changed
+      changed_when: true
+
+    - name: (Re)start the bridge
+      ansible.builtin.systemd_service:
+        name: "touchpad-middle-button@{{ item }}.service"
+        state: "{{ (_tp_script.changed or _tp_unit.changed) | ternary('restarted', 'started') }}"
+      loop: "{{ _tp_nodes }}"
+
+- name: Note the skipped middle-button bridge
+  ansible.builtin.debug:
+    msg: No 04F3:31AF touchpad on this machine — nothing to fix
+  when:
+    - touchpad_middle_button_enabled | bool
+    - _tp_hid.matched == 0

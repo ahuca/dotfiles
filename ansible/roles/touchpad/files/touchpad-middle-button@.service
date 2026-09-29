@@ -1,0 +1,31 @@
+# Managed by Ansible (roles/touchpad). Started per hidraw node by
+# 70-touchpad-middle-button.rules.
+[Unit]
+Description=Forward the touchpad middle button the kernel drops (%I)
+BindsTo=dev-%i.device
+After=dev-%i.device
+
+[Service]
+ExecStart=/usr/local/libexec/touchpad-middle-button /dev/%I
+Restart=on-failure
+RestartSec=2
+
+# Root only to open the root-owned device nodes; no capabilities needed.
+CapabilityBoundingSet=
+NoNewPrivileges=yes
+DevicePolicy=closed
+DeviceAllow=char-hidraw r
+DeviceAllow=/dev/uinput rw
+# python-evdev opens the event node it just created.
+DeviceAllow=char-input r
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
