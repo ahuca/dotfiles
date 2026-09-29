@@ -13,6 +13,15 @@
   become: true
   tags: [apt]
 
+# Rule is stored even while ufw is disabled, so pairing survives enabling it.
+- name: Open the KDE Connect ports in ufw
+  community.general.ufw:
+    rule: allow
+    name: KDEConnect
+  become: true
+  when: "'kdeconnect' in apt_packages"
+  tags: [apt, kdeconnect]
+
 - name: Install snap packages
   community.general.snap:
     name: "{{ item.name }}"

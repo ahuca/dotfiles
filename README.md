@@ -71,6 +71,7 @@ ansible-playbook site.yml -K --check         # dry run
 ansible-playbook site.yml -K --tags packages # just the package installs
 ansible-playbook site.yml -K --tags copyq    # just the CopyQ hotkey
 ansible-playbook site.yml -K --tags ghostty  # just the Ghostty config
+ansible-playbook site.yml -K --tags kdeconnect  # just the KDE Connect ufw rule
 ansible-playbook site.yml --tags zsh_plugins  # just the oh-my-zsh plugins
 ansible-playbook site.yml -K --tags docker   # just Docker Engine (and its repo)
 ansible-playbook site.yml -K --tags git      # just git signing + profiles (unlock Bitwarden first)
@@ -89,7 +90,7 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 |------------|------------------------------------------------------------------------------|
 | `common`   | apt keyring dir, base tooling (curl, wget, git, gpg, …)                       |
 | `apt_repos`| signing keys + deb822 `.sources` for Charm, VS Code, GitHub CLI, Claude Code, Edge, Microsoft prod (Intune) |
-| `packages` | apt packages, snaps (Bitwarden, PowerShell), D2, UniFi Identity Desktop      |
+| `packages` | apt packages (incl. KDE Connect + its ufw ports), snaps (Bitwarden, PowerShell), D2, UniFi Identity Desktop |
 | `docker`   | Docker's apt repo + Docker Engine, Buildx, Compose; you in the `docker` group |
 | `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); opt-in `< > \|` on the key left of 1 (`xkb_lsgt_on_tlde`) |
 | `ghostty`  | Ghostty config (`roles/ghostty/files/config.ghostty`, Windows Terminal-style keys) |

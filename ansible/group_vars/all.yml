@@ -82,6 +82,7 @@ apt_packages:
   - keepassxc
   - copyq
   - wl-clipboard
+  - kdeconnect
   - ghostty
   - zsh
   - fzf
