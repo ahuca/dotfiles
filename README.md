@@ -93,7 +93,7 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 | `packages` | apt packages (incl. KDE Connect + its ufw ports), snaps (Bitwarden, PowerShell), D2, UniFi Identity Desktop |
 | `docker`   | Docker's apt repo + Docker Engine, Buildx, Compose; you in the `docker` group |
 | `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); opt-in `< > \|` on the key left of 1 (`xkb_lsgt_on_tlde`) |
-| `ghostty`  | Ghostty config (`roles/ghostty/files/config.ghostty`, Windows Terminal-style keys) |
+| `ghostty`  | Ghostty config (`roles/ghostty/files/config.ghostty`, Windows Terminal-style keys; F11 fullscreen, Ctrl+Enter left to apps such as Claude Code) |
 | `shell`    | zsh + oh-my-zsh (plugins: git, z, fzf, fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting), PowerShell-style grey history suggestions, login shell, Bitwarden SSH-agent socket |
 | `git`      | SSH commit/tag signing with the Bitwarden agent key matching `user.email` (looked up per commit), allowed signers file; per-remote `user.email` profiles (`git_profiles`) with matching `~/.ssh/config` hosts |
 | `nodejs`   | nvm + latest LTS node, set as the default                                     |
