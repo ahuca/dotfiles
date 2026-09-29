@@ -10,6 +10,18 @@
   when: oh_my_zsh_enabled | bool
   tags: [zsh]
 
+- name: Clone the oh-my-zsh plugins it doesn't bundle
+  ansible.builtin.git:
+    repo: "{{ item.repo }}"
+    dest: "{{ target_home }}/.oh-my-zsh/custom/plugins/{{ item.name }}"
+    depth: 1
+    update: "{{ package_state == 'latest' }}"
+  loop: "{{ oh_my_zsh_custom_plugins }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: oh_my_zsh_enabled | bool
+  tags: [zsh, zsh_plugins]
+
 # Plugins added by hand in ~/.zshrc are dropped.
 - name: Enable oh-my-zsh plugins
   ansible.builtin.lineinfile:
@@ -18,7 +30,18 @@
     line: "plugins=({{ oh_my_zsh_plugins | join(' ') }})"
     insertbefore: '^source \$ZSH/oh-my-zsh\.sh'
   when: oh_my_zsh_enabled | bool
-  tags: [zsh, z]
+  tags: [zsh, z, zsh_plugins]
+
+# Grey suggestion from history (→ accepts), else from completion.
+- name: Configure autosuggestions
+  ansible.builtin.blockinfile:
+    path: "{{ target_home }}/.zshrc"
+    marker: "# {mark} ANSIBLE MANAGED — autosuggestions"
+    insertafter: '^source \$ZSH/oh-my-zsh\.sh'
+    block: |
+      ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+  when: oh_my_zsh_enabled | bool
+  tags: [zsh, zsh_plugins]
 
 - name: Locate the zsh binary
   ansible.builtin.command: which zsh

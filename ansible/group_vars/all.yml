@@ -84,6 +84,7 @@ apt_packages:
   - wl-clipboard
   - ghostty
   - zsh
+  - fzf
   - glow
   - code
   - gh
@@ -127,7 +128,14 @@ ghostty_config_enabled: true
 
 # ── shell ───────────────────────────────────────────────────────────
 oh_my_zsh_enabled: true
-oh_my_zsh_plugins: [git, z]
+# fzf-tab must come after the completion plugins, zsh-syntax-highlighting last.
+oh_my_zsh_plugins: [git, z, fzf, fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting]
+# Not bundled with oh-my-zsh: cloned into $ZSH_CUSTOM/plugins, pulled again
+# with package_state=latest.
+oh_my_zsh_custom_plugins:
+  - { name: fzf-tab, repo: https://github.com/Aloxaf/fzf-tab }
+  - { name: zsh-autosuggestions, repo: https://github.com/zsh-users/zsh-autosuggestions }
+  - { name: zsh-syntax-highlighting, repo: https://github.com/zsh-users/zsh-syntax-highlighting }
 zsh_set_default_shell: true
 
 # Appears once "Enable SSH agent" is ticked in Bitwarden's settings.

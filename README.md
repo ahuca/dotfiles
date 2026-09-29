@@ -71,6 +71,7 @@ ansible-playbook site.yml -K --check         # dry run
 ansible-playbook site.yml -K --tags packages # just the package installs
 ansible-playbook site.yml -K --tags copyq    # just the CopyQ hotkey
 ansible-playbook site.yml -K --tags ghostty  # just the Ghostty config
+ansible-playbook site.yml --tags zsh_plugins  # just the oh-my-zsh plugins
 ansible-playbook site.yml -K --tags docker   # just Docker Engine (and its repo)
 ansible-playbook site.yml -K --tags git      # just git signing + profiles (unlock Bitwarden first)
 ansible-playbook site.yml -K --skip-tags docker  # everything except Docker
@@ -92,7 +93,7 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 | `docker`   | Docker's apt repo + Docker Engine, Buildx, Compose; you in the `docker` group |
 | `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); opt-in `< > \|` on the key left of 1 (`xkb_lsgt_on_tlde`) |
 | `ghostty`  | Ghostty config (`roles/ghostty/files/config.ghostty`, Windows Terminal-style keys) |
-| `shell`    | zsh + oh-my-zsh (plugins: git, z), login shell, Bitwarden SSH-agent socket   |
+| `shell`    | zsh + oh-my-zsh (plugins: git, z, fzf, fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting), PowerShell-style grey history suggestions, login shell, Bitwarden SSH-agent socket |
 | `git`      | SSH commit/tag signing with the Bitwarden agent key matching `user.email` (looked up per commit), allowed signers file; per-remote `user.email` profiles (`git_profiles`) with matching `~/.ssh/config` hosts |
 | `nodejs`   | nvm + latest LTS node, set as the default                                     |
 | `homebrew` | Linuxbrew + `opencode` (which pulls in ripgrep)                               |
