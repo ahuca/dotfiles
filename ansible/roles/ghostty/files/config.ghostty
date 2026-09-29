@@ -31,6 +31,10 @@ keybind = ctrl+shift+n=new_window
 keybind = ctrl+shift+z=toggle_split_zoom
 keybind = ctrl+shift+p=toggle_command_palette
 
+# Fullscreen on F11 like other Linux apps; free ctrl+enter for the shell/TUIs
+keybind = ctrl+enter=unbind
+keybind = f11=toggle_fullscreen
+
 keybind = ctrl+a=select_all
 keybind = ctrl+shift+i=inspector:toggle
 
