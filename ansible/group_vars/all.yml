@@ -87,6 +87,9 @@ apt_packages:
   - zsh
   - fzf
   - glow
+  - lazygit
+  - git-delta
+  - tealdeer # the tldr command
   - code
   - gh
   - microsoft-edge-stable
@@ -104,6 +107,10 @@ snap_packages:
 
 d2_enabled: true
 d2_bin: /usr/local/bin/d2
+
+# Not packaged for Ubuntu: the .deb from the latest GitHub release.
+topgrade_enabled: true
+topgrade_repo: topgrade-rs/topgrade
 
 # Fallback if this stops resolving: https://ui.com/download/app/identity-desktop
 unifi_identity_enabled: true

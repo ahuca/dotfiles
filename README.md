@@ -72,6 +72,7 @@ ansible-playbook site.yml -K --tags packages # just the package installs
 ansible-playbook site.yml -K --tags copyq    # just the CopyQ hotkey
 ansible-playbook site.yml -K --tags ghostty  # just the Ghostty config
 ansible-playbook site.yml -K --tags kdeconnect  # just the KDE Connect ufw rule
+ansible-playbook site.yml -K --tags topgrade  # just topgrade (.deb from its GitHub release)
 ansible-playbook site.yml -K --tags touchpad  # just the touchpad middle-button fix
 ansible-playbook site.yml --tags zsh_plugins  # just the oh-my-zsh plugins
 ansible-playbook site.yml -K --tags docker   # just Docker Engine (and its repo)
@@ -91,7 +92,7 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 |------------|------------------------------------------------------------------------------|
 | `common`   | apt keyring dir, base tooling (curl, wget, git, gpg, …)                       |
 | `apt_repos`| signing keys + deb822 `.sources` for Charm, VS Code, GitHub CLI, Claude Code, Edge, Microsoft prod (Intune) |
-| `packages` | apt packages (incl. KDE Connect + its ufw ports), snaps (Bitwarden, PowerShell), D2, UniFi Identity Desktop |
+| `packages` | apt packages (incl. KDE Connect + its ufw ports, lazygit, delta, tldr via tealdeer + its pages), snaps (Bitwarden, PowerShell), D2, topgrade, UniFi Identity Desktop |
 | `docker`   | Docker's apt repo + Docker Engine, Buildx, Compose; you in the `docker` group |
 | `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); opt-in `< > \|` on the key left of 1 (`xkb_lsgt_on_tlde`) |
 | `touchpad` | ASUS ProArt Studiobook touchpad: a root service that forwards the physical middle button the kernel drops (only where that touchpad is present; see below) |

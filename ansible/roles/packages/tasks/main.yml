@@ -51,6 +51,53 @@
         creates: "{{ d2_bin }}"
       become: true
 
+- name: Download the tldr pages
+  ansible.builtin.command:
+    cmd: tldr --update
+    creates: "{{ target_home }}/.cache/tealdeer/tldr-pages"
+  when: "'tealdeer' in apt_packages"
+  tags: [apt, tldr]
+
+- name: Install topgrade
+  when: topgrade_enabled | bool
+  tags: [topgrade]
+  block:
+    - name: Look up the latest topgrade release
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/{{ topgrade_repo }}/releases/latest"
+        return_content: true
+      register: _topgrade_release
+      check_mode: false
+
+    - name: Download the topgrade .deb
+      ansible.builtin.get_url:
+        url: "{{ _topgrade_asset.browser_download_url }}"
+        # GitHub's "sha256:<hex>" digest of the asset.
+        checksum: "{{ _topgrade_asset.digest }}"
+        dest: /tmp/topgrade.deb
+        mode: "0644"
+      vars:
+        _topgrade_asset: >-
+          {{ _topgrade_release.json.assets
+             | selectattr('name', 'match', '^topgrade_.*_' ~ deb_architecture ~ '[.]deb$')
+             | first }}
+      changed_when: false
+      check_mode: false
+
+    - name: Install the topgrade .deb
+      ansible.builtin.apt:
+        deb: /tmp/topgrade.deb
+      become: true
+  rescue:
+    - name: Explain the topgrade failure without failing the run
+      ansible.builtin.debug:
+        msg: >-
+          topgrade could not be installed automatically — GitHub's API may be
+          rate-limited or the release has no .deb for {{ deb_architecture }}.
+          Download it from https://github.com/{{ topgrade_repo }}/releases and
+          install it with `sudo apt install -y ./topgrade_*.deb`, or set
+          topgrade_enabled: false.
+
 - name: Install UniFi Identity Desktop
   when: unifi_identity_enabled | bool
   tags: [unifi]
