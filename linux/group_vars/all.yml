@@ -61,6 +61,17 @@ apt_repositories:
     components: main
     architectures: [amd64]
 
+  # ONLYOFFICE Desktop Editors. "squeeze" is the suite for every release.
+  # Also carries its own ttf-mscorefonts-installer, which (unlike Ubuntu's)
+  # asks no EULA question, so the install runs unattended.
+  - name: onlyoffice
+    key_url: https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE
+    # fingerprint E09CA29F6E178040EF22B4098320CA65CB2DE8E5
+    keyring: onlyoffice.asc
+    uris: https://download.onlyoffice.com/repo/debian
+    suites: squeeze
+    components: main
+
 # Docker's repo is registered by the docker role.
 
 # One-line .list files from older manual setups; they duplicate the above.
@@ -71,6 +82,7 @@ legacy_apt_lists:
   - claude-code.list
   - microsoft-edge-stable.list
   - microsoft-prod.list
+  - onlyoffice.list
 
 # stable | latest
 claude_code_channel: latest
@@ -94,6 +106,7 @@ apt_packages:
   - gh
   - microsoft-edge-stable
   - intune-portal
+  - onlyoffice-desktopeditors
 
 # Upgraded on every run, regardless of package_state.
 apt_packages_latest:
