@@ -135,3 +135,77 @@
     - xkb_lsgt_on_tlde | bool
     - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is not defined
   tags: [keyboard, gnome]
+
+# GNOME on Wayland only loads a new extension at login, so this installs and
+# enables it for the next one. GNOME updates it from then on.
+- name: Install the GNOME Shell extensions
+  when:
+    - gnome_extensions | length > 0 or gnome_extensions_disabled | length > 0
+    - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
+  tags: [extensions, gnome]
+  vars:
+    _ext_dir: "{{ target_home }}/.local/share/gnome-shell/extensions"
+  block:
+    - name: Read the GNOME Shell version
+      ansible.builtin.command: gnome-shell --version
+      register: _gnome_shell_version
+      changed_when: false
+      check_mode: false
+
+    - name: Look for the installed extensions
+      ansible.builtin.stat:
+        path: "{{ _ext_dir }}/{{ item }}"
+      loop: "{{ gnome_extensions }}"
+      register: _ext_stat
+
+    - name: Download the missing extensions
+      ansible.builtin.get_url:
+        url: "https://extensions.gnome.org/download-extension/{{ item.item }}.shell-extension.zip?shell_version={{ _shell_major }}"
+        dest: "/tmp/{{ item.item }}.zip"
+        mode: "0644"
+      vars:
+        _shell_major: "{{ _gnome_shell_version.stdout | regex_search('[0-9]+') }}"
+      loop: "{{ _ext_stat.results | rejectattr('stat.exists') | list }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Install the missing extensions
+      ansible.builtin.command: gnome-extensions install --force /tmp/{{ item.item }}.zip
+      changed_when: true
+      loop: "{{ _ext_stat.results | rejectattr('stat.exists') | list }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Read the enabled and disabled extension lists
+      community.general.dconf:
+        key: "/org/gnome/shell/{{ item }}"
+        state: read
+      loop: [enabled-extensions, disabled-extensions]
+      register: _ext_lists
+
+    - name: Enable ours and disable the conflicting ones, preserving the rest
+      community.general.dconf:
+        key: "/org/gnome/shell/{{ item.key }}"
+        value: "{{ item.value | to_json }}"
+        state: present
+      vars:
+        _enabled: "{{ _ext_lists.results[0].value | default('', true) | regex_findall(\"'([^']+)'\") }}"
+        _disabled: "{{ _ext_lists.results[1].value | default('', true) | regex_findall(\"'([^']+)'\") }}"
+      loop:
+        - key: enabled-extensions
+          value: "{{ (_enabled + gnome_extensions) | unique | difference(gnome_extensions_disabled) }}"
+          current: "{{ _enabled }}"
+        - key: disabled-extensions
+          value: "{{ (_disabled + gnome_extensions_disabled) | unique | difference(gnome_extensions) }}"
+          current: "{{ _disabled }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when: item.value | sort != item.current | sort
+
+- name: Note the skipped GNOME Shell extensions
+  ansible.builtin.debug:
+    msg: No D-Bus session bus — re-run from your desktop session with --tags extensions
+  when:
+    - gnome_extensions | length > 0 or gnome_extensions_disabled | length > 0
+    - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is not defined
+  tags: [extensions, gnome]

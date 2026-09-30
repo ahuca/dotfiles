@@ -131,6 +131,14 @@ wm_toggle_above_bindings: ["<Super><Control>t"]
 # Put < > | on the key left of 1, for keyboards without the key left of Z.
 xkb_lsgt_on_tlde: false
 
+# User extensions from extensions.gnome.org (by UUID), enabled at next login.
+gnome_extensions:
+  - tilingshell@ferrarodomenico.com
+# Disabled so they don't fight the above (Tiling Shell replaces Ubuntu's
+# Tiling Assistant snapping).
+gnome_extensions_disabled:
+  - tiling-assistant@ubuntu.com
+
 # ── touchpad ────────────────────────────────────────────────────────
 # Forward the ASUS ProArt Studiobook touchpad's middle button, which the kernel
 # drops. Skips itself on machines without that touchpad.
