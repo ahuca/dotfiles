@@ -16,26 +16,17 @@
       tags: [desktop]
     - role: touchpad
       tags: [touchpad]
-    - role: ghostty
-      tags: [ghostty]
     - role: shell
       tags: [shell]
-    - role: git
-      tags: [git]
-    # nvm runs after the shell role so it appends its init to ~/.zshrc too.
     - role: nodejs
       tags: [node]
     - role: homebrew
       tags: [brew]
-    # After homebrew, which installs opencode.
-    - role: secrets
-      tags: [secrets]
 
   post_tasks:
     - name: Wrap up
       ansible.builtin.debug:
         msg:
-          - "Done. Log out and back in for zsh to take effect."
+          - "Done. Dotfiles (git, ssh, zsh, secrets) come next from chezmoi: bootstrap.sh runs it, or `chezmoi apply`."
+          - "Log out and back in for zsh to take effect."
           - "Bitwarden: Settings -> tick 'Enable SSH agent', unlock the vault, add SSH-key items."
-          - "Secrets: run `rbw login` once, then `sync-secrets` to populate the runtime dir."
-          - "Then verify a model call works and move ~/.local/share/opencode/auth.json aside."

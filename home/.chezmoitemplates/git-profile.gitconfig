@@ -1,0 +1,16 @@
+{{- /* ~/.config/git/<.profileName>.gitconfig: included for that profile's repos. */ -}}
+{{- $ids := includeTemplate "git-identities" . | fromJson -}}
+{{- range $p := $ids.profiles -}}
+{{-   if eq $p.name $.profileName -}}
+# Managed by chezmoi (home/.chezmoitemplates/git-profile.gitconfig).
+[user]
+	email = {{ $p.email }}
+{{-     if and $p.owner $p.key }}
+# Shares its host with other repos, so ~/.ssh/config can't route it, and
+# skipping it is the only way to stop ssh offering the host's key first: ssh
+# offers agent keys in the agent's order, not the -i order.
+[core]
+	sshCommand = {{ includeTemplate "ssh-command" $ }} -F none -o IdentitiesOnly=yes{{ if ne $.chezmoi.os "windows" }} -o IdentityAgent={{ $.vault.sshAgentSocket }}{{ end }} -i '{{ joinPath $.chezmoi.homeDir ".ssh/git-profiles" (print $p.name ".pub") | replace "\\" "/" }}'
+{{-     end }}
+{{    end -}}
+{{- end -}}

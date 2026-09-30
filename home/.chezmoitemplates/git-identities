@@ -1,0 +1,34 @@
+{{- /* Every identity git may commit as, as JSON: the global one and each
+       profile with a host and an email, with the agent key whose comment is
+       that email (empty if none). While the agent is locked, the keys come
+       from the files an earlier apply wrote, so nothing is lost. */ -}}
+{{- $home := .chezmoi.homeDir -}}
+{{- $agent := includeTemplate "agent-keys" . -}}
+{{- $known := "" -}}
+{{- $signersFile := joinPath $home ".config/git/allowed_signers" -}}
+{{- if stat $signersFile }}{{ $known = include $signersFile }}{{ end -}}
+{{- $email := dig "git" "email" "" . -}}
+{{- $global := dict "email" $email "key" "" -}}
+{{- if $email }}{{ $_ := set $global "key" (includeTemplate "key-for" (dict "agent" $agent "known" $known "email" $email)) }}{{ end -}}
+{{- $profiles := list -}}
+{{- $data := dig "git" "profiles" dict . -}}
+{{- range $name := keys $data | sortAlpha -}}
+{{- /* chezmoi can't make one file per profile, so each needs its wrappers. */ -}}
+{{-   range $wrapper := list (printf "private_dot_config/git/%s.gitconfig.tmpl" $name) (printf "private_dot_ssh/private_git-profiles/%s.pub.tmpl" $name) -}}
+{{-     if not (stat (joinPath $.chezmoi.sourceDir $wrapper)) -}}
+{{-       fail (printf "git profile '%s' has no home/%s: copy the personal one and change the name in it" $name $wrapper) -}}
+{{-     end -}}
+{{-   end -}}
+{{-   $p := index $data $name -}}
+{{-   if and $p.host $p.email -}}
+{{-     $pubText := "" -}}
+{{- /* ~/.ssh/bitwarden is where the Ansible role and the first chezmoi applies put them. */ -}}
+{{-     range $dir := list ".ssh/git-profiles" ".ssh/bitwarden" -}}
+{{-       $pub := joinPath $home $dir (print $name ".pub") -}}
+{{-       if and (not $pubText) (stat $pub) }}{{ $pubText = include $pub }}{{ end -}}
+{{-     end -}}
+{{-     $key := includeTemplate "key-for" (dict "agent" (print $agent "\n" $pubText) "known" $known "email" $p.email) -}}
+{{-     $profiles = append $profiles (dict "name" $name "host" $p.host "owner" ($p.owner | default "") "hostname" ($p.hostname | default "github.com") "email" $p.email "key" $key) -}}
+{{-   end -}}
+{{- end -}}
+{{- dict "global" $global "profiles" $profiles | toJson -}}

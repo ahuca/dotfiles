@@ -1,0 +1,3 @@
+# Targets chezmoi deletes on apply.
+# The git profiles' public keys used to live here; now ~/.ssh/git-profiles.
+.ssh/bitwarden

@@ -1,0 +1,81 @@
+{{- /*
+  This machine's chezmoi config (~/.config/chezmoi/chezmoi.toml), rendered by
+  `chezmoi init`. Everything personal lives here, never in the repo: each value
+  is asked once, defaulting to the environment or to what the machine already
+  knows, and later inits keep the stored answer. An empty answer skips that
+  feature. `chezmoi init --prompt` asks again; `--promptDefaults` takes the
+  defaults without asking (no terminal).
+*/ -}}
+{{- $home := .chezmoi.homeDir -}}
+{{- $git := lookPath "git" -}}
+
+{{- /* git identity: git's own global config */ -}}
+{{- $name := env "GIT_NAME" -}}
+{{- $email := env "GIT_EMAIL" -}}
+{{- if $git -}}
+{{-   if not $name }}{{ $name = output "git" "config" "--global" "--default" "" "user.name" | trim }}{{ end -}}
+{{-   if not $email }}{{ $email = output "git" "config" "--global" "--default" "" "user.email" | trim }}{{ end -}}
+{{- end -}}
+
+{{- /* Vaultwarden: the environment (RBW_* is the older spelling), else rbw's
+       config (Linux) */ -}}
+{{- $vaultUrl := env "VAULT_URL" | default (env "RBW_BASE_URL") -}}
+{{- $vaultEmail := env "VAULT_EMAIL" | default (env "RBW_EMAIL") -}}
+{{- $rbwConfig := joinPath $home ".config/rbw/config.json" -}}
+{{- if stat $rbwConfig -}}
+{{-   $rbw := include $rbwConfig | fromJson -}}
+{{-   if not $vaultUrl }}{{ $vaultUrl = $rbw.base_url | default "" }}{{ end -}}
+{{-   if not $vaultEmail }}{{ $vaultEmail = $rbw.email | default "" }}{{ end -}}
+{{- end -}}
+
+{{- /* The profiles' routes from an earlier apply (or the Ansible git role
+       before it), for their defaults */ -}}
+{{- $routes := "" -}}
+{{- $routesFile := joinPath $home ".config/git/profiles.gitconfig" -}}
+{{- if stat $routesFile }}{{ $routes = include $routesFile }}{{ end -}}
+
+{{- if ne .chezmoi.os "windows" }}
+umask = 0o022
+{{- end }}
+sourceDir = {{ .chezmoi.workingTree | replace "\\" "/" | quote }}
+{{- if eq .chezmoi.os "windows" }}
+
+# Scripts run under PowerShell 7, whatever the machine's execution policy.
+[interpreters.ps1]
+    command = "pwsh"
+    # chezmoi appends the script's path, so -File comes last.
+    args = ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File"]
+{{- end }}
+
+[data.git]
+    name = {{ promptStringOnce . "git.name" "Git user.name" $name | quote }}
+    email = {{ promptStringOnce . "git.email" "Git user.email (also picks the signing key)" $email | quote }}
+
+[data.vault]
+    url = {{ promptStringOnce . "vault.url" "Vaultwarden URL (Enter to skip secrets)" $vaultUrl | quote }}
+    email = {{ promptStringOnce . "vault.email" "Vaultwarden login email" $vaultEmail | quote }}
+
+# Git profiles: a repo whose remote is git@<host>:... (narrowed to <owner>/...
+# if set) gets that profile's user.email and signing key. Empty host or email
+# => skipped. The names come from the list in home/.chezmoi.toml.tmpl; a new
+# one also needs home/private_dot_config/git/<name>.gitconfig.tmpl and
+# home/private_dot_ssh/private_git-profiles/<name>.pub.tmpl (copy personal's).
+{{- range $p := list "personal" "work" }}
+{{-   $env := printf "GIT_%s_" (upper $p) }}
+{{-   $route := regexFind (printf `url:git@[^:"]+:[^"]*"\]\s*path = %s[.]gitconfig` $p) $routes }}
+{{-   $host := env (print $env "HOST") }}
+{{-   if and (not $host) $route }}{{ $host = regexReplaceAll `^url:git@([^:]+):(?s).*$` $route "${1}" }}{{ end }}
+{{-   if and (not $host) (eq $p "personal") }}{{ $host = "github.com" }}{{ end }}
+{{-   $owner := env (print $env "OWNER") }}
+{{-   if and (not $owner) $route }}{{ $owner = regexReplaceAll `^url:git@[^:]+:([^"]*)"(?s).*$` $route "${1}" | trimSuffix "/**" | replace "**" "" }}{{ end }}
+{{-   $pEmail := env (print $env "EMAIL") }}
+{{-   $pFile := joinPath $home (printf ".config/git/%s.gitconfig" $p) }}
+{{-   if and (not $pEmail) $git (stat $pFile) }}{{ $pEmail = output "git" "config" "--file" $pFile "--default" "" "user.email" | trim }}{{ end }}
+
+[data.git.profiles.{{ $p }}]
+    host = {{ promptStringOnce $ (printf "git.profiles.%s.host" $p) (printf "Git %s profile: SSH host of its remotes (an alias for a second account; Enter to skip)" $p) $host | quote }}
+    owner = {{ promptStringOnce $ (printf "git.profiles.%s.owner" $p) (printf "Git %s profile: only repos of this user/org on that host (Enter for all)" $p) $owner | quote }}
+    email = {{ promptStringOnce $ (printf "git.profiles.%s.email" $p) (printf "Git %s profile: user.email" $p) $pEmail | quote }}
+    # The real server behind host, when host is an ~/.ssh/config alias.
+    hostname = {{ dig "git" "profiles" $p "hostname" "github.com" $ | quote }}
+{{- end }}

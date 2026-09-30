@@ -1,0 +1,13 @@
+{{- /* "<type> <key>" of the agent key whose comment is .email ("<type> <key>
+       <comment>" lines in .agent), else of its "<email> <type> <key>" line in
+       .known, as written by an earlier apply while the agent was unlocked. */ -}}
+{{- $key := "" -}}
+{{- range $line := splitList "\n" .agent -}}
+{{-   $f := splitList " " (trim $line) -}}
+{{-   if and (not $key) (ge (len $f) 3) (eq (last $f) $.email) }}{{ $key = printf "%s %s" (index $f 0) (index $f 1) }}{{ end -}}
+{{- end -}}
+{{- range $line := splitList "\n" .known -}}
+{{-   $f := splitList " " (trim $line) -}}
+{{-   if and (not $key) (ge (len $f) 3) (eq (index $f 0) $.email) }}{{ $key = printf "%s %s" (index $f 1) (index $f 2) }}{{ end -}}
+{{- end -}}
+{{- $key -}}

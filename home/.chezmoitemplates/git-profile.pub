@@ -1,0 +1,8 @@
+{{- /* ~/.ssh/git-profiles/<.profileName>.pub: the public half of that profile's
+       agent key. ssh can only pick one of the agent's keys through a key
+       file; the private half never leaves Bitwarden. */ -}}
+{{- $ids := includeTemplate "git-identities" . | fromJson -}}
+{{- range $p := $ids.profiles -}}
+{{-   if and (eq $p.name $.profileName) $p.key }}{{ $p.key }} {{ $p.email }}
+{{    end -}}
+{{- end -}}

@@ -1,0 +1,3 @@
+{{- /* The ssh git runs. Git for Windows' own ssh can't reach the named pipe
+       Bitwarden's agent listens on; Windows' OpenSSH can. */ -}}
+{{- if eq .chezmoi.os "windows" }}C:/Windows/System32/OpenSSH/ssh.exe{{ else }}ssh{{ end -}}

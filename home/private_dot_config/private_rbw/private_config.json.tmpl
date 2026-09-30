@@ -1,0 +1,12 @@
+{{- dict
+      "email" .vault.email
+      "sso_id" nil
+      "base_url" .vault.url
+      "identity_url" nil
+      "ui_url" nil
+      "notifications_url" nil
+      "lock_timeout" .vault.rbw.lockTimeout
+      "sync_interval" .vault.rbw.syncInterval
+      "pinentry" .vault.rbw.pinentry
+      "client_cert_path" nil
+    | toPrettyJson "  " }}

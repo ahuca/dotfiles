@@ -1,0 +1,8 @@
+{{- $ids := includeTemplate "git-identities" . | fromJson -}}
+{{- $lines := list -}}
+{{- range $id := prepend $ids.profiles $ids.global }}{{ if $id.key }}{{ $lines = append $lines (printf "%s %s" $id.email $id.key) }}{{ end }}{{ end -}}
+{{- if $lines -}}
+# Managed by chezmoi. Lets `git log --show-signature` / `git verify-commit`
+# check SSH signatures.
+{{ $lines | uniq | join "\n" }}
+{{ end -}}

@@ -1,0 +1,20 @@
+{{- $ids := includeTemplate "git-identities" . | fromJson -}}
+# Managed by chezmoi (home/private_dot_ssh/private_config.tmpl). Your own
+# hosts go in ~/.ssh/config.local, read first, so its settings win.
+Include config.local
+{{- range $p := $ids.profiles }}
+{{-   if and $p.key (not $p.owner) }}
+
+# git profile '{{ $p.name }}': offers only its Bitwarden key, so the right
+# account authenticates even when several share one HostName. Owner-scoped
+# profiles pick their key through core.sshCommand instead.
+Host {{ $p.host }}
+    HostName {{ $p.hostname }}
+    User git
+{{-     if ne $.chezmoi.os "windows" }}
+    IdentityAgent {{ $.vault.sshAgentSocket }}
+{{-     end }}
+    IdentityFile ~/.ssh/git-profiles/{{ $p.name }}.pub
+    IdentitiesOnly yes
+{{-   end }}
+{{- end }}

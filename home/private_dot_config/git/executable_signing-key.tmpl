@@ -1,0 +1,13 @@
+#!/bin/sh
+# Managed by chezmoi. gpg.ssh.defaultKeyCommand: the agent key whose comment
+# is this repo's user.email, so each profile signs with its own key without
+# storing it.
+email=$(git config user.email) || { echo "user.email is not set" >&2; exit 1; }
+{{- if eq .chezmoi.os "windows" }}
+# Git for Windows' own ssh-add can't reach Bitwarden's named pipe.
+key=$(/c/Windows/System32/OpenSSH/ssh-add.exe -L | tr -d '\r' | awk -v e="$email" '$NF == e { print $1, $2; exit }')
+{{- else }}
+key=$(ssh-add -L | awk -v e="$email" '$NF == e { print $1, $2; exit }')
+{{- end }}
+[ -n "$key" ] || { echo "no key for $email in the SSH agent" >&2; exit 1; }
+echo "key::$key"

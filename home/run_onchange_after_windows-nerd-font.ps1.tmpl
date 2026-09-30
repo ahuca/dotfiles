@@ -1,0 +1,14 @@
+{{- if eq .chezmoi.os "windows" -}}
+# CaskaydiaCove Nerd Font (Cascadia Code with Nerd Font glyphs) for Oh My
+# Posh; Windows Terminal is set to it. Oh My Posh installs fonts per user, so
+# no admin is needed.
+$ErrorActionPreference = 'Stop'
+$fontDirs = "$env:LOCALAPPDATA\Microsoft\Windows\Fonts", "$env:SystemRoot\Fonts"
+if (Get-ChildItem -Path $fontDirs -Filter 'CaskaydiaCoveNerdFont*' -ErrorAction SilentlyContinue) { return }
+if (-not (Get-Command oh-my-posh -ErrorAction Ignore)) {
+    Write-Warning 'oh-my-posh is not installed yet (windows\configuration.winget); the Nerd Font is skipped until the next chezmoi apply.'
+    return
+}
+oh-my-posh font install CascadiaCode
+if ($LASTEXITCODE) { throw 'oh-my-posh could not install the CascadiaCode Nerd Font.' }
+{{ end -}}

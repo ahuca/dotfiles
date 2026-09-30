@@ -1,0 +1,31 @@
+# Everything that comes from your Bitwarden vault (a Vaultwarden server). The
+# server URL and login are per machine, so they live in chezmoi.toml
+# (vault.url / vault.email) and are merged in with this.
+vault:
+  # The Bitwarden desktop app's SSH agent holds every SSH key; nothing private
+  # is written to disk. It appears once "Enable SSH agent" is ticked in the
+  # app's settings. This is the Linux (snap) socket. On Windows the agent takes
+  # over OpenSSH's default named pipe, so nothing needs pointing at it.
+  sshAgentSocket: ~/snap/bitwarden/current/.bitwarden-ssh-agent.sock
+
+  # API keys that `sync-secrets` fetches (rbw on Linux, the Bitwarden CLI on
+  # Windows) into a directory that doesn't outlive the session: tmpfs on
+  # Linux, an owner-only folder cleared at logon on Windows. Nothing chezmoi
+  # renders holds a key; opencode reads them through {file:...}.
+  # folder is case-sensitive; field defaults to the password.
+  # Check names with: rbw list --fields name,folder
+  secrets:
+    - { dest: openrouter.work.key, folder: Work, item: openrouter.ai, field: apikey }
+    - { dest: openrouter.personal.key, folder: Personal, item: openrouter.ai, field: apikey }
+    - { dest: jira.work.user, folder: Work, item: id.atlassian.com, field: username }
+    - { dest: jira.work.key, folder: Work, item: id.atlassian.com, field: apikey }
+    # Site URL (https://<tenant>.atlassian.net) lives in the vault, not the repo.
+    - { dest: jira.work.url, folder: Work, item: id.atlassian.com, field: url }
+
+  # rbw, the vault client sync-secrets uses on Linux.
+  rbw:
+    pinentry: pinentry-gnome3      # pinentry-curses when headless
+    lockTimeout: 28800
+    syncInterval: 3600             # 0 disables
+    # A systemd user unit that runs sync-secrets when the desktop session starts.
+    syncOnLogin: false

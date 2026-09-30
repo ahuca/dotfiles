@@ -1,0 +1,11 @@
+{{- if eq .chezmoi.os "windows" -}}
+# Make PowerShell 7 load ~/.config/powershell/profile.ps1 (chezmoi). Its own
+# profile lives under Documents, which OneDrive may have moved, so this asks
+# for the path and adds one line rather than managing that file.
+$ErrorActionPreference = 'Stop'
+$target = $PROFILE.CurrentUserAllHosts
+if ((Test-Path $target) -and (Select-String -LiteralPath $target -SimpleMatch '.config\powershell\profile.ps1' -Quiet)) { return }
+New-Item -ItemType Directory -Force -Path (Split-Path $target) | Out-Null
+Add-Content -LiteralPath $target -Value '. "$HOME\.config\powershell\profile.ps1"   # dotfiles (chezmoi)'
+Write-Host "Loading ~\.config\powershell\profile.ps1 from $target"
+{{ end -}}

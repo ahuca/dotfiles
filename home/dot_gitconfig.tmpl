@@ -1,0 +1,73 @@
+{{- $ids := includeTemplate "git-identities" . | fromJson -}}
+{{- $win := eq .chezmoi.os "windows" -}}
+{{- $gitDir := joinPath .chezmoi.homeDir ".config/git" | replace "\\" "/" -}}
+{{- $signing := false -}}
+{{- range $id := append $ids.profiles $ids.global }}{{ if $id.key }}{{ $signing = true }}{{ end }}{{ end -}}
+# Managed by chezmoi: edit home/dot_gitconfig.tmpl in the dotfiles repo (or
+# the answers in ~/.config/chezmoi/chezmoi.toml), then `chezmoi apply`.
+# Machine-only settings go in ~/.gitconfig.local.
+{{- if or .git.name .git.email }}
+[user]
+{{-   if .git.name }}
+	name = {{ .git.name }}
+{{-   end }}
+{{-   if .git.email }}
+	email = {{ .git.email }}
+{{-   end }}
+{{- end }}
+{{- if and (not $win) (lookPath "gh") }}
+[credential "https://github.com"]
+	helper =
+	helper = !{{ lookPath "gh" }} auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !{{ lookPath "gh" }} auth git-credential
+{{- end }}
+{{- if $win }}
+[core]
+	sshCommand = {{ includeTemplate "ssh-command" . }}
+{{- end }}
+{{- if $signing }}
+
+# Commits and tags are signed with the Bitwarden agent key whose comment is the
+# repo's user.email, looked up per commit (signing-key), so no key is stored
+# here and the vault must be unlocked to commit.
+[gpg]
+	format = ssh
+[gpg "ssh"]
+	allowedSignersFile = {{ $gitDir }}/allowed_signers
+	# Split like a shell command line (not run through one): quoted if the
+	# path has a space.
+	defaultKeyCommand = {{ if contains " " $gitDir }}'{{ $gitDir }}/signing-key'{{ else }}{{ $gitDir }}/signing-key{{ end }}
+{{-   if $win }}
+	program = C:/Windows/System32/OpenSSH/ssh-keygen.exe
+{{-   end }}
+[commit]
+	gpgsign = true
+[tag]
+	gpgsign = true
+{{- end }}
+{{- if lookPath "delta" }}
+
+# delta as the pager; left out while it isn't installed, since git errors on a
+# missing pager.
+[core]
+	pager = delta
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	# n / N jump between files.
+	navigate = true
+{{- end }}
+[merge]
+	# Conflict markers also show the common ancestor.
+	conflictStyle = zdiff3
+
+# After [user], so the profiles' user.email wins; the local file comes first
+# so the profiles still win over it.
+[include]
+	path = ~/.gitconfig.local
+{{- if $ids.profiles }}
+[include]
+	path = {{ $gitDir }}/profiles.gitconfig
+{{- end }}

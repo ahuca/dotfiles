@@ -5,6 +5,8 @@
     creates: "{{ target_home }}/.nvm/nvm.sh"
   environment:
     NVM_DIR: "{{ target_home }}/.nvm"
+    # ~/.zshrc (chezmoi) already loads nvm; don't append to it.
+    PROFILE: /dev/null
   when: nvm_enabled | bool
 
 - name: Install node and make it the default in new shells

@@ -1,0 +1,29 @@
+# Managed by chezmoi (home/dot_zshrc.tmpl in the dotfiles repo). Ansible
+# installs oh-my-zsh and the plugins it doesn't bundle; this only loads them.
+# Machine-only additions go in ~/.zshrc.local.
+
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="robbyrussell"
+
+# fzf-tab must come after the completion plugins, zsh-syntax-highlighting last.
+plugins=(git z fzf fzf-tab zsh-autosuggestions zsh-syntax-highlighting)
+
+source $ZSH/oh-my-zsh.sh
+
+# Grey suggestion from history (→ accepts), else from completion.
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+[ -x /home/linuxbrew/.linuxbrew/bin/brew ] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+# Every SSH key lives in Bitwarden's agent.
+export SSH_AUTH_SOCK="{{ .vault.sshAgentSocket | replace "~" "$HOME" }}"
+
+# zsh never reads ~/.profile, which is where Ubuntu puts ~/.local/bin on PATH
+# (pipx's ansible, sync-secrets).
+export PATH="$HOME/.local/bin:$PATH"
+
+[ -r ~/.zshrc.local ] && source ~/.zshrc.local

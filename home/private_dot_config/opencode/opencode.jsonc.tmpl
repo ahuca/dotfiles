@@ -1,0 +1,85 @@
+{{- $dir := includeTemplate "secrets-dir" . -}}
+{
+  // Managed by chezmoi (home/private_dot_config/opencode/opencode.jsonc.tmpl).
+  // Keys come from `sync-secrets`.
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": "notify",
+  "model": "work/z-ai/glm-5.3-flash",
+  "small_model": "work/z-ai/glm-5.3-flash",
+  "provider": {
+    "work": {
+      "npm": "@openrouter/ai-sdk-provider",
+      "options": {
+        "apiKey": "{file:{{ $dir }}/openrouter.work.key}"
+      },
+      "models": {
+        "z-ai/glm-5.3-flash": {
+          "attachment": true,
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
+          "options": {
+            "provider": {
+              "order": ["relace", "deepinfra"],
+              "only": ["relace", "deepinfra"]
+            }
+          }
+        },
+        "deepseek/deepseek-v4-flash-0731": {
+          "options": {
+            "provider": {
+              "order": ["relace", "inceptron", "deepinfra"],
+              "only": ["relace", "inceptron", "deepinfra"]
+            }
+          }
+        }
+      }
+    },
+    "personal": {
+      "npm": "@openrouter/ai-sdk-provider",
+      "options": {
+        "apiKey": "{file:{{ $dir }}/openrouter.personal.key}"
+      },
+      "models": {
+        "z-ai/glm-5.3-flash": {
+          "attachment": true,
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
+          "options": {
+            "provider": {
+              "order": ["relace", "deepinfra"],
+              "only": ["relace", "deepinfra"]
+            }
+          }
+        },
+        "deepseek/deepseek-v4-flash-0731": {
+          "options": {
+            "provider": {
+              "order": ["relace", "inceptron", "deepinfra"],
+              "only": ["relace", "inceptron", "deepinfra"]
+            }
+          }
+        }
+      }
+    }
+  },
+  "mcp": {
+    "GitHits": {
+      "type": "remote",
+      "url": "https://mcp.githits.com"
+    },
+    "atlassian": {
+      "type": "local",
+      "command": ["uvx", "mcp-atlassian"],
+      "enabled": true,
+      "environment": {
+        "JIRA_URL": "{file:{{ $dir }}/jira.work.url}",
+        "JIRA_USERNAME": "{file:{{ $dir }}/jira.work.user}",
+        "JIRA_API_TOKEN": "{file:{{ $dir }}/jira.work.key}"
+      }
+    }
+  }
+}

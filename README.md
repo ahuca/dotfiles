@@ -1,12 +1,21 @@
-# dotfiles — local provisioning with Ansible
+# dotfiles — Ubuntu workstation
 
-Ansible playbooks that provision this Ubuntu workstation against itself.
-Nothing here talks to a remote host: the inventory is `localhost` with
-`ansible_connection=local`.
+Two layers, one repo:
+
+- **`linux/`** is an Ansible project that provisions this Ubuntu workstation against itself: apt repos
+  and packages, GNOME, udev, systemd, TPM, VMware — anything machine-wide.
+  Nothing here talks to a remote host: the inventory is `localhost` with
+  `ansible_connection=local`.
+- **`home/`** holds the dotfiles for Ubuntu and Windows, applied with
+  [chezmoi](https://www.chezmoi.io/): git and its per-remote profiles, SSH,
+  delta and lazygit, zsh / PowerShell, Ghostty / Windows Terminal, and the
+  Vaultwarden secrets plumbing. Templates pick the right variant per OS.
 
 ```
-bootstrap.sh          installs Ansible + collections, then runs site.yml
-linux/
+bootstrap.sh          installs Ansible, runs site.yml, then chezmoi
+.chezmoiroot          tells chezmoi its source state is home/
+home/                 the dotfiles (chezmoi source state; see below)
+linux/                the Ansible project
   site.yml            default entry point -> playbooks/workstation.yml
   inventory.ini       localhost, local connection
   group_vars/all.yml  ALL the configuration (package lists, repos, hotkeys, ...)
@@ -17,7 +26,7 @@ linux/
   roles/              one role per concern
 ```
 
-## Quick start
+## Quick start (Ubuntu)
 
 Fresh machine, nothing cloned (the repo is public, so no credentials needed):
 
@@ -25,14 +34,14 @@ Fresh machine, nothing cloned (the repo is public, so no credentials needed):
 wget -qO- https://raw.githubusercontent.com/ahuca/dotfiles/main/bootstrap.sh | bash
 ```
 
-It clones to `~/Projects/dotfiles`, provisions, then runs `rbw login` and
-`sync-secrets`. You type your sudo password once (bootstrap checks it, then
-reuses it for its own `sudo` calls and hands it to Ansible through a pipe as
-the become password) and your Vaultwarden master password; on a machine's
-first run it also asks for the Vaultwarden URL and
-login email once. Those two are deliberately not in this repo; afterwards they
-are read back from `~/.config/rbw/config.json` (or set `RBW_BASE_URL` /
-`RBW_EMAIL`). Press Enter at the URL prompt to skip secrets entirely.
+It clones to `~/Projects/dotfiles`, provisions, applies the dotfiles with
+chezmoi, then runs `rbw login` and `sync-secrets`. You type your sudo password
+once (bootstrap checks it, then reuses it for its own `sudo` calls and hands it
+to Ansible through a pipe as the become password) and your Vaultwarden master
+password. On a machine's first run chezmoi also asks, once, for the few
+personal values this repo deliberately doesn't hold — see
+[Per-machine values](#per-machine-values). Press Enter at the Vaultwarden URL
+prompt to skip secrets entirely.
 
 From an existing checkout:
 
@@ -70,21 +79,22 @@ ansible-playbook site.yml -K                 # everything
 ansible-playbook site.yml -K --check         # dry run
 ansible-playbook site.yml -K --tags packages # just the package installs
 ansible-playbook site.yml -K --tags copyq    # just the CopyQ hotkey
-ansible-playbook site.yml -K --tags ghostty  # just the Ghostty config
 ansible-playbook site.yml -K --tags kdeconnect  # just the KDE Connect ufw rule
 ansible-playbook site.yml -K --tags topgrade  # just topgrade (.deb from its GitHub release)
 ansible-playbook site.yml --tags extensions  # just the GNOME Shell extensions (Tiling Shell)
-ansible-playbook site.yml --tags delta      # just delta as git's / lazygit's pager
 ansible-playbook site.yml -K --tags touchpad  # just the touchpad middle-button fix
 ansible-playbook site.yml --tags zsh_plugins  # just the oh-my-zsh plugins
 ansible-playbook site.yml -K --tags docker   # just Docker Engine (and its repo)
-ansible-playbook site.yml -K --tags git      # just git signing + profiles (unlock Bitwarden first)
 ansible-playbook site.yml -K --skip-tags docker  # everything except Docker
 ```
 
 `-K` prompts for the sudo password; drop it only if you have genuinely
 passwordless (`NOPASSWD`) sudo. A warm sudo timestamp is not enough — Ansible's
 become runs without a tty, and sudo-rs rejects a cached ticket there.
+
+`bootstrap.sh` applies the dotfiles only after a whole workstation run (no
+`--tags`); with `--check` it shows `chezmoi diff` instead. Otherwise run
+chezmoi yourself — see [Dotfiles](#dotfiles-home-via-chezmoi).
 
 ## What `workstation.yml` sets up
 
@@ -94,15 +104,13 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 |------------|------------------------------------------------------------------------------|
 | `common`   | apt keyring dir, base tooling (curl, wget, git, gpg, …)                       |
 | `apt_repos`| signing keys + deb822 `.sources` for Charm, VS Code, GitHub CLI, Claude Code, Edge, Microsoft prod (Intune), ONLYOFFICE |
-| `packages` | apt packages (incl. KDE Connect + its ufw ports, lazygit, delta, tldr via tealdeer + its pages, ONLYOFFICE Desktop Editors), snaps (Bitwarden, PowerShell), D2, topgrade, UniFi Identity Desktop |
+| `packages` | apt packages (incl. KDE Connect + its ufw ports, lazygit, delta, tldr via tealdeer + its pages, rbw + pinentry for `sync-secrets`, ONLYOFFICE Desktop Editors), snaps (Bitwarden, PowerShell), D2, topgrade, UniFi Identity Desktop |
 | `docker`   | Docker's apt repo + Docker Engine, Buildx, Compose; you in the `docker` group |
 | `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); opt-in `< > \|` on the key left of 1 (`xkb_lsgt_on_tlde`); GNOME Shell extensions from extensions.gnome.org (`gnome_extensions`: Tiling Shell, replacing Ubuntu's Tiling Assistant; loads at next login) |
 | `touchpad` | ASUS ProArt Studiobook touchpad: a root service that forwards the physical middle button the kernel drops (only where that touchpad is present; see below) |
-| `ghostty`  | Ghostty config (`roles/ghostty/files/config.ghostty`, Windows Terminal-style keys; F11 fullscreen, Ctrl+Enter left to apps such as Claude Code) |
-| `shell`    | zsh + oh-my-zsh (plugins: git, z, fzf, fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting), PowerShell-style grey history suggestions, login shell, Bitwarden SSH-agent socket |
-| `git`      | SSH commit/tag signing with the Bitwarden agent key matching `user.email` (looked up per commit), allowed signers file; per-remote `user.email` profiles (`git_profiles`) with matching `~/.ssh/config` hosts; delta as git's pager (`git_delta_enabled`) and lazygit's diff viewer |
+| `shell`    | oh-my-zsh and the plugins it doesn't bundle (fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting); zsh as the login shell. `~/.zshrc` itself comes from chezmoi |
 | `nodejs`   | nvm + latest LTS node, set as the default                                     |
-| `homebrew` | Linuxbrew + `opencode` (which pulls in ripgrep)                               |
+| `homebrew` | Linuxbrew + `opencode` (which pulls in ripgrep) + `chezmoi`                   |
 
 #### Three notes on how packages are sourced
 
@@ -166,27 +174,100 @@ kernel maps the button itself.
 - Bitwarden: **Settings → Enable SSH agent**, unlock the vault, add SSH-key
   items. The socket only exists once the agent is on; `ssh-add -l` then lists
   your keys.
-- Git profiles: a repo takes its `user.email` (and signing key) from its
-  remote URL — `git@github.com:…` for personal, and for work either the
-  org on the same host (`git@github.com:<org>/…`, via `GIT_WORK_OWNER`) or
-  an `~/.ssh/config` alias such as `git@<work-alias>:…`. Neither the emails,
-  the org nor the alias are in this repo; give them once and later runs read
-  them back from `~/.config/git/`:
+- Then `chezmoi apply` once more, so git finds the signing keys (see
+  [Git profiles and signing](#git-profiles-and-signing)).
 
-  ```bash
-  GIT_PERSONAL_EMAIL=… GIT_WORK_HOST=github.com GIT_WORK_OWNER=… GIT_WORK_EMAIL=… \
-    ansible-playbook site.yml --tags git
-  ```
+## Dotfiles: `home/` via chezmoi
 
-  Each profile signs with, and ssh authenticates its host with, the Bitwarden
-  key whose comment is its email, so unlock the vault first. All SSH keys
-  live in Bitwarden: the role writes only their public halves, to
-  `~/.ssh/bitwarden/<profile>.pub`, which the managed block at the top of
-  `~/.ssh/config` points `IdentityFile` at (ssh has no other way to pick one
-  agent key per host). An owner-scoped profile shares its host, so its
-  `core.sshCommand` skips `~/.ssh/config` and offers only its key. The owner
-  match is case-sensitive, like git's globs. `git config user.email` inside a
-  repo shows which profile it got.
+Everything under `$HOME` comes from `home/`, chezmoi's source state
+(`.chezmoiroot` points it there, so the rest of the repo is invisible to it).
+Ansible installs software; chezmoi writes the configuration. Both bootstraps
+run `chezmoi init --apply --source <checkout>`, which also records the
+checkout as chezmoi's source directory, so afterwards:
+
+```bash
+chezmoi diff             # what apply would change
+chezmoi apply            # write it
+chezmoi edit ~/.zshrc    # edit the source file behind a target
+chezmoi init --prompt    # answer the per-machine questions again
+```
+
+A target you edited by hand makes `chezmoi apply` stop and ask. Keep
+machine-only additions in the local files the managed ones read:
+`~/.gitconfig.local`, `~/.ssh/config.local`, `~/.zshrc.local`.
+
+| Target | Linux | Windows |
+|--------|:-----:|:-------:|
+| `~/.gitconfig`, `~/.config/git/` — identity, SSH signing, per-remote profiles, delta | ✓ | ✓ |
+| `~/.ssh/config`, `~/.ssh/git-profiles/*.pub` — one Bitwarden key per profile host | ✓ | ✓ |
+| lazygit (delta as its pager) — `~/.config/lazygit/` / `%LOCALAPPDATA%\lazygit\` | ✓ | ✓ |
+| `~/.config/opencode/opencode.jsonc` — keys by `{file:}` reference | ✓ | ✓ |
+| `sync-secrets` — `~/.local/bin/sync-secrets` / `sync-secrets.ps1` | rbw | bw |
+| `~/.config/powershell/profile.ps1` — history suggestions, menu Tab, Oh My Posh | ✓ | ✓ |
+| `~/.zshrc`, rbw's config, Ghostty's config | ✓ | |
+| Windows Terminal (PowerShell 7 default, CaskaydiaCove Nerd Font), the Nerd Font itself | | ✓ |
+
+Templates branch on `.chezmoi.os`; `home/.chezmoiignore` drops what a
+platform doesn't use. Shared pieces live in `home/.chezmoitemplates/`, and
+repo data in `home/.chezmoidata/vault.yaml`: everything from the vault (the
+secrets list, rbw's settings, the SSH agent socket) under one `vault` key,
+merged with the per-machine `vault.url` / `vault.email`.
+
+### Per-machine values
+
+Nothing identifying is in the repo. `chezmoi init` asks once for each value
+below and stores the answer in `~/.config/chezmoi/chezmoi.toml`; each prompt
+defaults to what the machine already knows, so on a machine the old Ansible
+roles set up it only asks you to confirm. An empty answer turns that feature
+off.
+
+| Value | Default taken from |
+|-------|--------------------|
+| git `user.name` / `user.email` | `GIT_NAME` / `GIT_EMAIL`, else `git config --global` |
+| Vaultwarden URL and login | `VAULT_URL` / `VAULT_EMAIL` (or the older `RBW_BASE_URL` / `RBW_EMAIL`), else `~/.config/rbw/config.json` |
+| each git profile's host, owner and email | `GIT_PERSONAL_HOST` / `_OWNER` / `_EMAIL` (and `GIT_WORK_*`), else the files the old git role wrote |
+
+Without a terminal, `chezmoi init --promptDefaults` takes the defaults.
+
+### Git profiles and signing
+
+A repo takes its `user.email` (and signing key) from its remote URL —
+`git@github.com:…` for personal, and for work either the org on the same host
+(`git@github.com:<org>/…`, the profile's owner) or an `~/.ssh/config` alias
+such as `git@<work-alias>:…` (the profile's host). Commits and tags are signed
+with the Bitwarden agent key whose comment is the repo's `user.email`, looked
+up at commit time by `~/.config/git/signing-key`, so no key is stored in git's
+config and the vault must be unlocked to commit.
+
+ssh can only pick one of the agent's keys through a key file, so chezmoi
+writes each profile's public half to `~/.ssh/git-profiles/<profile>.pub` and
+points that profile's `Host` block at it. An owner-scoped profile shares its
+host, so its `core.sshCommand` skips `~/.ssh/config` and offers only its key.
+The owner match is case-sensitive, like git's globs. `git config user.email`
+inside a repo shows which profile it got.
+
+The keys are read from the agent at apply time. While Bitwarden is locked,
+chezmoi keeps the ones an earlier apply wrote; on a fresh machine, unlock it
+and `chezmoi apply` again to switch signing on. On Windows, git talks to
+Windows' own OpenSSH (`C:/Windows/System32/OpenSSH`), whose default pipe
+Bitwarden's agent takes over; Git for Windows' bundled ssh can't reach it.
+
+### Secrets
+
+`sync-secrets` fetches the API keys listed under `vault.secrets` in `home/.chezmoidata/vault.yaml`
+from Vaultwarden into a directory nothing else can read, and opencode's config
+refers to them by path. chezmoi never renders a key.
+
+- **Linux**: rbw, into `/run/user/<uid>/dotfiles/secrets` (tmpfs, gone at logout).
+  `vault.rbw.syncOnLogin: true` adds a systemd user unit that runs it at login.
+- **Windows**: the Bitwarden CLI (`bw`), into
+  `%LOCALAPPDATA%\dotfiles\secrets`, readable only by you and SYSTEM. Windows
+  has no tmpfs, so a SYSTEM task (from `windows/configuration.winget`) empties
+  it at each logon. The keys sit on disk until then, so keep BitLocker on.
+  `bw` keeps no session between runs, so each `sync-secrets` asks for the
+  master password.
+
+`sync-secrets --check` (`-Check` on Windows) only runs the smoke tests.
 
 ## `tpm-unlock.yml` — LUKS auto-unlock via TPM2
 

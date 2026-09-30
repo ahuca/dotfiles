@@ -1,0 +1,26 @@
+{{- /* Targets chezmoi leaves alone on this machine. */ -}}
+{{- if ne .chezmoi.os "windows" }}
+AppData
+.local/bin/sync-secrets.ps1
+{{- end }}
+{{- if ne .chezmoi.os "linux" }}
+.zshrc
+.cache
+.local/share
+.local/bin/sync-secrets
+.config/ghostty
+.config/lazygit
+.config/rbw
+.config/systemd
+{{- end }}
+{{- if not (and .vault.url .vault.email) }}
+# No vault: no secrets plumbing.
+.config/rbw
+.config/opencode
+.config/systemd/user/sync-secrets.service
+.local/bin/sync-secrets
+.local/bin/sync-secrets.ps1
+{{- end }}
+{{- if not .vault.rbw.syncOnLogin }}
+.config/systemd/user/sync-secrets.service
+{{- end }}

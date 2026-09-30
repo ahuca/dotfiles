@@ -1,0 +1,18 @@
+{{- $ids := includeTemplate "git-identities" . | fromJson -}}
+{{- if $ids.profiles -}}
+# Managed by chezmoi. Included from ~/.gitconfig: a repo takes the identity of
+# the SSH host its remote points at, or of the owner (user or org) on that
+# host. Owner routes come last: the last include wins, so they beat their
+# host's. Paths are relative to this file.
+{{- $ordered := concat (list) -}}
+{{- range $p := $ids.profiles }}{{ if not $p.owner }}{{ $ordered = append $ordered $p }}{{ end }}{{ end -}}
+{{- range $p := $ids.profiles }}{{ if $p.owner }}{{ $ordered = append $ordered $p }}{{ end }}{{ end -}}
+{{- range $p := $ordered }}
+{{-   $owner := "" }}{{ if $p.owner }}{{ $owner = print $p.owner "/" }}{{ end }}
+
+[includeIf "hasconfig:remote.*.url:git@{{ $p.host }}:{{ $owner | default "**/" }}**"]
+	path = {{ $p.name }}.gitconfig
+[includeIf "hasconfig:remote.*.url:ssh://git@{{ $p.host }}/{{ $owner }}**"]
+	path = {{ $p.name }}.gitconfig
+{{- end }}
+{{ end -}}

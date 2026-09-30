@@ -42,17 +42,15 @@
       when: _brew_clone.changed
       changed_when: true
 
-    - name: Load brew into future zsh and bash sessions
+    # ~/.zshrc (chezmoi) loads it too.
+    - name: Load brew into future bash sessions
       ansible.builtin.blockinfile:
-        path: "{{ target_home }}/{{ item }}"
+        path: "{{ target_home }}/.bashrc"
         create: true
         mode: "0644"
         marker: "# {mark} ANSIBLE MANAGED — homebrew shellenv"
         block: |
           eval "$({{ homebrew_prefix }}/bin/brew shellenv)"
-      loop:
-        - .zshrc
-        - .bashrc
 
     - name: Install Homebrew packages
       community.general.homebrew:

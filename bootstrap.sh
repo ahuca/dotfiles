@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Install Ansible, then provision this machine from linux/.
+# Install Ansible, provision this machine from linux/, then apply the
+# dotfiles in home/ with chezmoi.
 #
 #   ./bootstrap.sh                 # run site.yml
 #   ./bootstrap.sh --tags packages # args go straight to ansible-playbook
@@ -114,23 +115,6 @@ sudo apt-get install -y python3-apt python3-psutil dbus
 log "Installing Ansible collections"
 ansible-galaxy collection install -r "$ANSIBLE_DIR/requirements.yml"
 
-# --- vault location (kept out of the repo) ------------------------------
-# Env, else what rbw already knows on this machine, else ask once. With no
-# terminal (unattended install) they stay empty and the secrets role skips.
-rbw_conf="$HOME/.config/rbw/config.json"
-rbw_conf_get() {
-  [[ -r "$rbw_conf" ]] || return 0
-  python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get(sys.argv[2]) or "")' \
-    "$rbw_conf" "$1" 2>/dev/null || true
-}
-: "${RBW_BASE_URL:=$(rbw_conf_get base_url)}"
-: "${RBW_EMAIL:=$(rbw_conf_get email)}"
-if [[ -t 0 ]]; then
-  [[ -n "$RBW_BASE_URL" ]] || read -rp "Vaultwarden URL (Enter to skip secrets): " RBW_BASE_URL
-  [[ -z "$RBW_BASE_URL" || -n "$RBW_EMAIL" ]] || read -rp "Vaultwarden login email: " RBW_EMAIL
-fi
-export RBW_BASE_URL RBW_EMAIL
-
 # --- run ---------------------------------------------------------------
 log "Running $PLAYBOOK"
 cd "$ANSIBLE_DIR"
@@ -149,16 +133,50 @@ if [[ -n "$SUDO_PASS" ]]; then
 fi
 ansible-playbook "$PLAYBOOK" ${BECOME_ARGS+"${BECOME_ARGS[@]}"} ${EXTRA_ARGS+"${EXTRA_ARGS[@]}"}
 
-# --- secrets -----------------------------------------------------------
-# Log in and fill the tmpfs key files, so a fresh machine is one command.
-# Not for dry runs, other playbooks, tag selections without secrets, or no tty.
+# --- dotfiles ----------------------------------------------------------
+# Everything under $HOME (git, ssh, zsh, the secrets plumbing) comes from
+# home/ via chezmoi, which the playbook installs. The first init asks for the
+# few personal values (git identity and profiles, Vaultwarden URL and login)
+# and keeps them in ~/.config/chezmoi/chezmoi.toml, outside this repo.
+# VAULT_URL / VAULT_EMAIL, GIT_<PROFILE>_HOST/_OWNER/_EMAIL pre-fill them.
+# Only after a whole workstation run; a dry run shows the diff instead.
 args=" ${EXTRA_ARGS[*]-} "
 tags_re='(^| )(--tags|-t)[= ]'
-if [[ -t 0 && -x "$HOME/.local/bin/sync-secrets" ]] && command -v rbw >/dev/null \
-   && [[ "$PLAYBOOK" == site.yml || "$PLAYBOOK" == *workstation.yml ]] \
-   && [[ "$args" != *" --check "* && "$args" != *" -C "* ]] \
-   && { ! [[ "$args" =~ $tags_re ]] || [[ "$args" == *secrets* ]]; } \
-   && [[ "$args" != *--skip-tags*secrets* ]]; then
+check_re='(^| )(--check|-C)( |$)'
+applied=0
+if [[ "$PLAYBOOK" == site.yml || "$PLAYBOOK" == *workstation.yml ]] \
+   && ! [[ "$args" =~ $tags_re ]]; then
+  # Homebrew's prefix, as the homebrew role has it.
+  brew_prefix="$(sed -n 's/^homebrew_prefix: *//p' "$ANSIBLE_DIR/group_vars/all.yml")"
+  export PATH="${brew_prefix:-/home/linuxbrew/.linuxbrew}/bin:$PATH"
+  if ! command -v chezmoi >/dev/null; then
+    warn "chezmoi is not installed (homebrew role), so the dotfiles were not applied."
+  elif [[ "$args" =~ $check_re ]]; then
+    if [[ -f "$HOME/.config/chezmoi/chezmoi.toml" ]]; then
+      log "Dotfiles that chezmoi would change"
+      chezmoi diff --no-pager || true
+    fi
+  else
+    log "Applying the dotfiles in home/ with chezmoi"
+    init_args=(--apply --source "$REPO_DIR")
+    [[ -t 0 ]] || init_args+=(--promptDefaults)
+    # A cancelled prompt (seen after arrow keys, whose escape sequence starts
+    # with Esc) stops init without saving anything, yet it still exits 0;
+    # the missing config file gives it away.
+    if chezmoi init "${init_args[@]}" && [[ -f "$HOME/.config/chezmoi/chezmoi.toml" ]]; then
+      applied=1
+    else
+      warn "chezmoi stopped before saving its answers, so nothing was applied.
+   Esc or an arrow key at a prompt seems to cancel it; answer with text and Enter.
+   Re-run:  chezmoi init --apply --source \"$REPO_DIR\""
+    fi
+  fi
+fi
+
+# --- secrets -----------------------------------------------------------
+# Log in and fill the tmpfs key files, so a fresh machine is one command.
+if [[ "$applied" -eq 1 && -t 0 && -x "$HOME/.local/bin/sync-secrets" ]] \
+   && command -v rbw >/dev/null; then
   log "Logging in to Vaultwarden and refreshing secrets"
   rbw login && "$HOME/.local/bin/sync-secrets" \
     || warn "sync-secrets reported a problem (see above). Re-run:  sync-secrets"

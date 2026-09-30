@@ -1,0 +1,12 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /* Windows Terminal rewrites its own settings.json, so chezmoi only sets
+       these keys and keeps the rest (comments are dropped). Its key bindings
+       already match Ghostty's on Linux, which copies them. */ -}}
+{{- $settings := dict -}}
+{{- if trim .chezmoi.stdin }}{{ $settings = fromJsonc .chezmoi.stdin }}{{ end -}}
+{{- /* The profile Windows Terminal generates for PowerShell 7. */ -}}
+{{- $settings = setValueAtPath "defaultProfile" "{574e775e-4f2a-5b96-ac1e-a2962a402336}" $settings -}}
+{{- /* Installed by run_onchange_after_windows-nerd-font.ps1; Oh My Posh's
+       prompt needs its glyphs. */ -}}
+{{- $settings = setValueAtPath "profiles.defaults.font.face" "CaskaydiaCove Nerd Font" $settings -}}
+{{ toPrettyJson "    " $settings }}

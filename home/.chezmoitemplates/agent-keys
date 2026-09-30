@@ -1,0 +1,8 @@
+{{- /* The Bitwarden SSH agent's public keys (`ssh-add -L`), or nothing while
+       it is locked or not running. */ -}}
+{{- if eq .chezmoi.os "windows" -}}
+{{-   output "cmd" "/c" `%SystemRoot%\System32\OpenSSH\ssh-add.exe -L 2>nul || exit /b 0` -}}
+{{- else -}}
+{{-   $sock := regexReplaceAll "^~" .vault.sshAgentSocket .chezmoi.homeDir -}}
+{{-   output "sh" "-c" (printf "SSH_AUTH_SOCK=%s ssh-add -L 2>/dev/null || true" (squote $sock)) -}}
+{{- end -}}
