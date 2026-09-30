@@ -1,20 +1,25 @@
-# dotfiles — Ubuntu workstation
+# dotfiles — Ubuntu and Windows workstations
 
-Two layers, one repo:
+Three layers, one repo:
 
 - **`linux/`** is an Ansible project that provisions this Ubuntu workstation against itself: apt repos
   and packages, GNOME, udev, systemd, TPM, VMware — anything machine-wide.
   Nothing here talks to a remote host: the inventory is `localhost` with
   `ansible_connection=local`.
-- **`home/`** holds the dotfiles for Ubuntu and Windows, applied with
+- **`windows/`** is the Windows counterpart, a WinGet configuration: packages and
+  the few machine-wide settings, applied with `winget configure`.
+- **`home/`** holds the dotfiles for both, applied with
   [chezmoi](https://www.chezmoi.io/): git and its per-remote profiles, SSH,
   delta and lazygit, zsh / PowerShell, Ghostty / Windows Terminal, and the
   Vaultwarden secrets plumbing. Templates pick the right variant per OS.
 
 ```
-bootstrap.sh          installs Ansible, runs site.yml, then chezmoi
+bootstrap.sh          Linux: installs Ansible, runs site.yml, then chezmoi
+bootstrap.ps1         Windows: winget configure, then chezmoi
 .chezmoiroot          tells chezmoi its source state is home/
 home/                 the dotfiles (chezmoi source state; see below)
+windows/
+  configuration.winget  Windows packages and machine-wide settings
 linux/                the Ansible project
   site.yml            default entry point -> playbooks/workstation.yml
   inventory.ini       localhost, local connection
@@ -41,7 +46,7 @@ to Ansible through a pipe as the become password) and your Vaultwarden master
 password. On a machine's first run chezmoi also asks, once, for the few
 personal values this repo deliberately doesn't hold — see
 [Per-machine values](#per-machine-values). Press Enter at the Vaultwarden URL
-prompt to skip secrets entirely.
+prompt to skip secrets entirely. For Windows, see [Windows](#windows).
 
 From an existing checkout:
 
@@ -268,6 +273,48 @@ refers to them by path. chezmoi never renders a key.
   master password.
 
 `sync-secrets --check` (`-Check` on Windows) only runs the smoke tests.
+
+## Windows
+
+From Windows PowerShell (the built-in one is enough) as yourself, not as
+Administrator:
+
+```powershell
+irm https://raw.githubusercontent.com/ahuca/dotfiles/main/bootstrap.ps1 | iex
+```
+
+It installs Git if needed and clones to `~\Projects\dotfiles`. Then it runs
+`winget configure -f windows\configuration.winget`, which raises one UAC prompt
+for the machine-wide settings. Last it runs `chezmoi init --apply`, which asks
+the [per-machine questions](#per-machine-values), and `sync-secrets`. From a
+checkout: `.\bootstrap.ps1`, or `.\bootstrap.ps1 -SkipConfigure` for just the
+dotfiles and secrets. Needs winget 1.10.280 or later, for per-resource
+elevation.
+
+`windows/configuration.winget` installs:
+
+- **Shell**: PowerShell 7, Windows Terminal, Oh My Posh.
+- **Dotfiles and secrets**: chezmoi, Bitwarden, Bitwarden CLI.
+- **Dev tools**: Git, GitHub CLI, delta, lazygit, ripgrep, fzf, Neovim, glow,
+  tealdeer, 7-Zip, topgrade, Node.js LTS, VS Code, Claude Code, opencode, uv
+  (opencode's Atlassian MCP runs under `uvx`).
+- **Desktop**: Ditto (the CopyQ stand-in), ONLYOFFICE Desktop Editors, Everything.
+
+It also disables Windows' OpenSSH agent service, so Bitwarden's agent gets
+its pipe, and registers the logon task that empties the secrets folder. To add
+a package, copy a `WinGetPackage` entry and change its ids (`winget search
+<name>`).
+
+After the run:
+
+- Bitwarden: **Settings → Enable SSH agent**, unlock the vault, then
+  `chezmoi apply` so git finds the signing keys.
+- Open a new Windows Terminal: PowerShell 7 is the default profile, with Oh My
+  Posh's default theme in CaskaydiaCove Nerd Font. `oh-my-posh init pwsh
+  --config <theme>` in `~\.config\powershell\profile.ps1` picks another.
+
+Not tested on real Windows yet: the WinGet file, the scripts and the templates
+were only parsed, and rendered on Linux with the OS switched.
 
 ## `tpm-unlock.yml` — LUKS auto-unlock via TPM2
 
