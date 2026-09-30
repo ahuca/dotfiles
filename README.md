@@ -84,7 +84,7 @@ ansible-playbook site.yml -K                 # everything
 ansible-playbook site.yml -K --check         # dry run
 ansible-playbook site.yml -K --tags packages # just the package installs
 ansible-playbook site.yml -K --tags copyq    # just the CopyQ hotkey
-ansible-playbook site.yml -K --tags kdeconnect  # just the KDE Connect ufw rule
+ansible-playbook site.yml -K --tags kdeconnect  # just the KDE Connect ufw rule + XWayland clipboard fix
 ansible-playbook site.yml -K --tags topgrade  # just topgrade (.deb from its GitHub release)
 ansible-playbook site.yml --tags extensions  # just the GNOME Shell extensions (Tiling Shell)
 ansible-playbook site.yml -K --tags touchpad  # just the touchpad middle-button fix
@@ -109,7 +109,7 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 |------------|------------------------------------------------------------------------------|
 | `common`   | apt keyring dir, base tooling (curl, wget, git, gpg, …)                       |
 | `apt_repos`| signing keys + deb822 `.sources` for Charm, VS Code, GitHub CLI, Claude Code, Edge, Microsoft prod (Intune), ONLYOFFICE |
-| `packages` | apt packages (incl. KDE Connect + its ufw ports, lazygit, delta, tldr via tealdeer + its pages, rbw + pinentry for `sync-secrets`, ONLYOFFICE Desktop Editors), snaps (Bitwarden, PowerShell), D2, topgrade, UniFi Identity Desktop |
+| `packages` | apt packages (incl. KDE Connect + its ufw ports + XWayland start for clipboard sync, lazygit, delta, tldr via tealdeer + its pages, rbw + pinentry for `sync-secrets`, ONLYOFFICE Desktop Editors), snaps (Bitwarden, PowerShell), D2, topgrade, UniFi Identity Desktop |
 | `docker`   | Docker's apt repo + Docker Engine, Buildx, Compose; you in the `docker` group |
 | `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); opt-in `< > \|` on the key left of 1 (`xkb_lsgt_on_tlde`); GNOME Shell extensions from extensions.gnome.org (`gnome_extensions`: Tiling Shell, replacing Ubuntu's Tiling Assistant; loads at next login) |
 | `touchpad` | ASUS ProArt Studiobook touchpad: a root service that forwards the physical middle button the kernel drops (only where that touchpad is present; see below) |
