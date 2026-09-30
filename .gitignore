@@ -2,8 +2,9 @@
 __pycache__/
 *.pyc
 
-# Ansible run artefacts
+# Ansible run artefacts, and its local cache of collections and modules
 *.retry
+.ansible/
 
 # nohup output from local runs
 nohup.out
