@@ -202,6 +202,10 @@ git_profiles_file: "{{ git_config_dir }}/profiles.gitconfig"
 git_profiles_ssh: true
 git_ssh_key_dir: "{{ target_home }}/.ssh/bitwarden"
 
+# delta as git's pager, and as lazygit's diff viewer. Skipped until delta is
+# installed (packages role), since git errors out on a missing pager.
+git_delta_enabled: true
+
 # ── docker ──────────────────────────────────────────────────────────
 docker_enabled: true
 # Effectively root on this machine.

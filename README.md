@@ -74,6 +74,7 @@ ansible-playbook site.yml -K --tags ghostty  # just the Ghostty config
 ansible-playbook site.yml -K --tags kdeconnect  # just the KDE Connect ufw rule
 ansible-playbook site.yml -K --tags topgrade  # just topgrade (.deb from its GitHub release)
 ansible-playbook site.yml --tags extensions  # just the GNOME Shell extensions (Tiling Shell)
+ansible-playbook site.yml --tags delta      # just delta as git's / lazygit's pager
 ansible-playbook site.yml -K --tags touchpad  # just the touchpad middle-button fix
 ansible-playbook site.yml --tags zsh_plugins  # just the oh-my-zsh plugins
 ansible-playbook site.yml -K --tags docker   # just Docker Engine (and its repo)
@@ -99,7 +100,7 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 | `touchpad` | ASUS ProArt Studiobook touchpad: a root service that forwards the physical middle button the kernel drops (only where that touchpad is present; see below) |
 | `ghostty`  | Ghostty config (`roles/ghostty/files/config.ghostty`, Windows Terminal-style keys; F11 fullscreen, Ctrl+Enter left to apps such as Claude Code) |
 | `shell`    | zsh + oh-my-zsh (plugins: git, z, fzf, fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting), PowerShell-style grey history suggestions, login shell, Bitwarden SSH-agent socket |
-| `git`      | SSH commit/tag signing with the Bitwarden agent key matching `user.email` (looked up per commit), allowed signers file; per-remote `user.email` profiles (`git_profiles`) with matching `~/.ssh/config` hosts |
+| `git`      | SSH commit/tag signing with the Bitwarden agent key matching `user.email` (looked up per commit), allowed signers file; per-remote `user.email` profiles (`git_profiles`) with matching `~/.ssh/config` hosts; delta as git's pager (`git_delta_enabled`) and lazygit's diff viewer |
 | `nodejs`   | nvm + latest LTS node, set as the default                                     |
 | `homebrew` | Linuxbrew + `opencode` (which pulls in ripgrep)                               |
 

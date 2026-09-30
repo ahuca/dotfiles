@@ -114,3 +114,8 @@
         scope: global
         name: user.signingkey
         state: absent
+
+- name: Configure delta
+  ansible.builtin.import_tasks: delta.yml
+  when: git_delta_enabled | bool
+  tags: [delta]
