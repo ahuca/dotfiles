@@ -6,7 +6,7 @@ Nothing here talks to a remote host: the inventory is `localhost` with
 
 ```
 bootstrap.sh          installs Ansible + collections, then runs site.yml
-ansible/
+linux/
   site.yml            default entry point -> playbooks/workstation.yml
   inventory.ini       localhost, local connection
   group_vars/all.yml  ALL the configuration (package lists, repos, hotkeys, ...)
@@ -45,7 +45,7 @@ From an existing checkout:
 `bootstrap.sh` installs the **latest upstream `ansible-core`** with pipx into
 `~/.local/bin`, because Ubuntu's archive trails upstream (resolute ships
 ansible-core 2.20.1 against 2.21.4 upstream). Collections come from
-`ansible/requirements.yml` rather than the distro bundle.
+`linux/requirements.yml` rather than the distro bundle.
 
 To use the distro package instead:
 
@@ -65,7 +65,7 @@ resolves to `community.general.yaml`, which was removed in community.general
 After Ansible is installed you can drive it directly:
 
 ```bash
-cd ansible
+cd linux
 ansible-playbook site.yml -K                 # everything
 ansible-playbook site.yml -K --check         # dry run
 ansible-playbook site.yml -K --tags packages # just the package installs
@@ -131,7 +131,7 @@ required"* even when Ansible's own become works fine. The role instead creates
 the prefix as root, hands it to you, and uses Homebrew's documented git-clone
 install, which needs no privileges of its own.
 
-Everything configurable lives in `ansible/group_vars/all.yml` — add a package
+Everything configurable lives in `linux/group_vars/all.yml` — add a package
 to `apt_packages`, a repo to `apt_repositories`, and re-run.
 
 To upgrade installed packages rather than just ensure they are present:
@@ -195,7 +195,7 @@ boot. **Your passphrase stays as the fallback in slot 0** — nothing here
 touches it.
 
 ```bash
-cd ansible
+cd linux
 ansible-playbook playbooks/tpm-unlock.yml -K                        # first-time bind
 ansible-playbook playbooks/tpm-unlock.yml -K -e tpm_rebind=true     # re-seal against current PCRs
 ansible-playbook playbooks/tpm-unlock.yml -K -e tpm_pcrs=0,7        # custom PCR set
@@ -224,7 +224,7 @@ supervisor password so nobody can boot a USB stick to release the key via PCR7.
 The old script's subcommands are now tags:
 
 ```bash
-cd ansible
+cd linux
 ansible-playbook playbooks/vmware.yml -K -e vmware_vm_dir=~/vmware/win10  # full setup
 ansible-playbook playbooks/vmware.yml -K --tags modules                   # after a kernel bump
 ansible-playbook playbooks/vmware.yml -K --tags sign                      # sign already-built modules

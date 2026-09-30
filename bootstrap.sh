@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install Ansible, then provision this machine from ansible/.
+# Install Ansible, then provision this machine from linux/.
 #
 #   ./bootstrap.sh                 # run site.yml
 #   ./bootstrap.sh --tags packages # args go straight to ansible-playbook
@@ -39,7 +39,7 @@ if [[ ! -f "${BASH_SOURCE[0]:-}" ]]; then
 fi
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ANSIBLE_DIR="$REPO_DIR/ansible"
+ANSIBLE_DIR="$REPO_DIR/linux"
 ANSIBLE_SOURCE="${ANSIBLE_SOURCE:-pipx}"
 
 # -k: a cached sudo ticket would pass -n, but Ansible's become cannot use it.
