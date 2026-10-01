@@ -95,6 +95,34 @@
     - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is not defined
   tags: [keybindings, gnome]
 
+- name: Bind the layout switch
+  when:
+    - wm_switch_input_source_bindings | length > 0 or wm_switch_input_source_backward_bindings | length > 0
+    - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
+  tags: [keyboard, gnome]
+  block:
+    - name: Bind the layout switch forward
+      community.general.dconf:
+        key: /org/gnome/desktop/wm/keybindings/switch-input-source
+        value: "{{ wm_switch_input_source_bindings | to_json }}"
+        state: present
+      when: wm_switch_input_source_bindings | length > 0
+
+    - name: Bind the layout switch backward
+      community.general.dconf:
+        key: /org/gnome/desktop/wm/keybindings/switch-input-source-backward
+        value: "{{ wm_switch_input_source_backward_bindings | to_json }}"
+        state: present
+      when: wm_switch_input_source_backward_bindings | length > 0
+
+- name: Note the skipped layout switch
+  ansible.builtin.debug:
+    msg: No D-Bus session bus — re-run from your desktop session with --tags keyboard
+  when:
+    - wm_switch_input_source_bindings | length > 0 or wm_switch_input_source_backward_bindings | length > 0
+    - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is not defined
+  tags: [keyboard, gnome]
+
 - name: Deploy the custom XKB option
   ansible.builtin.copy:
     src: xkb/

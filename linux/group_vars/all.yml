@@ -144,6 +144,11 @@ copyq_autostart: true
 # already bound. [] leaves the setting alone.
 wm_toggle_above_bindings: ["<Super><Control>t"]
 
+# Shortcuts to switch the keyboard layout. These replace GNOME's default
+# (Super+Space), rather than adding to it. [] leaves the setting alone.
+wm_switch_input_source_bindings: ["<Control><Alt>space"]
+wm_switch_input_source_backward_bindings: ["<Shift><Control><Alt>space"]
+
 # Put < > | on the key left of 1, for keyboards without the key left of Z.
 xkb_lsgt_on_tlde: false
 
