@@ -132,22 +132,3 @@ properties:
         Name: ssh-agent
         StartupType: Disabled
         State: Stopped
-    # sync-secrets keeps API keys in %LOCALAPPDATA%\dotfiles\secrets. Windows
-    # has no tmpfs, so SYSTEM empties it at each logon. The folder is only
-    # readable by you and SYSTEM; SYSTEM runs out of sight, in session 0.
-    - resource: PSDscResources/Script
-      id: secretswipe
-      directives: { description: Empty the secrets folder at logon, securityContext: elevated, allowPrerelease: true }
-      settings:
-        GetScript: |
-          @{ Result = [string](Get-ScheduledTask -TaskName 'dotfiles-wipe-secrets' -ErrorAction SilentlyContinue).State }
-        TestScript: |
-          $task = Get-ScheduledTask -TaskName 'dotfiles-wipe-secrets' -ErrorAction SilentlyContinue
-          [bool]$task -and $task.Actions[0].Arguments -like "*$env:LOCALAPPDATA\dotfiles\secrets*"
-        SetScript: |
-          $dir = Join-Path $env:LOCALAPPDATA 'dotfiles\secrets'
-          $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/d /c if exist `"$dir`" rd /s /q `"$dir`""
-          $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
-          $principal = New-ScheduledTaskPrincipal -UserId 'S-1-5-18' -LogonType ServiceAccount
-          Register-ScheduledTask -TaskName 'dotfiles-wipe-secrets' -Description 'Empties the API keys sync-secrets fetched (dotfiles repo).' `
-            -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null

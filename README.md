@@ -111,7 +111,7 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 | `apt_repos`| signing keys + deb822 `.sources` for Charm, VS Code, GitHub CLI, Claude Code, Edge, Microsoft prod (Intune), ONLYOFFICE |
 | `packages` | apt packages (incl. KDE Connect + its ufw ports + XWayland start for clipboard sync, lazygit, delta, tldr via tealdeer + its pages, rbw + pinentry for `sync-secrets`, ONLYOFFICE Desktop Editors), snaps (Bitwarden, PowerShell), D2, topgrade, UniFi Identity Desktop |
 | `docker`   | Docker's apt repo + Docker Engine, Buildx, Compose; you in the `docker` group |
-| `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); opt-in `< > \|` on the key left of 1 (`xkb_lsgt_on_tlde`); GNOME Shell extensions from extensions.gnome.org (`gnome_extensions`: Tiling Shell, replacing Ubuntu's Tiling Assistant; loads at next login) |
+| `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); Ctrl+Alt+Space to switch the keyboard layout (`wm_switch_input_source_bindings`); opt-in `< > \|` on the key left of 1 (`xkb_lsgt_on_tlde`); GNOME Shell extensions from extensions.gnome.org (`gnome_extensions`: Tiling Shell, replacing Ubuntu's Tiling Assistant; loads at next login) |
 | `touchpad` | ASUS ProArt Studiobook touchpad: a root service that forwards the physical middle button the kernel drops (only where that touchpad is present; see below) |
 | `shell`    | oh-my-zsh and the plugins it doesn't bundle (fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting); zsh as the login shell. `~/.zshrc` itself comes from chezmoi |
 | `nodejs`   | nvm + latest LTS node, set as the default                                     |
@@ -260,17 +260,17 @@ Bitwarden's agent takes over; Git for Windows' bundled ssh can't reach it.
 ### Secrets
 
 `sync-secrets` fetches the API keys listed under `vault.secrets` in `home/.chezmoidata/vault.yaml`
-from Vaultwarden into a directory nothing else can read, and opencode's config
-refers to them by path. chezmoi never renders a key.
+from Vaultwarden into an owner-only directory, and opencode's config refers to
+them by path. chezmoi never renders a key. The keys persist on disk — both
+disks are encrypted (LUKS / BitLocker) — so they survive reboots until rotated
+or expired; exclude the directory from any home backup.
 
-- **Linux**: rbw, into `/run/user/<uid>/dotfiles/secrets` (tmpfs, gone at logout).
-  `vault.rbw.syncOnLogin: true` adds a systemd user unit that runs it at login.
+- **Linux**: rbw, into `~/.local/share/dotfiles/secrets`.
 - **Windows**: the Bitwarden CLI (`bw`), into
-  `%LOCALAPPDATA%\dotfiles\secrets`, readable only by you and SYSTEM. Windows
-  has no tmpfs, so a SYSTEM task (from `windows/configuration.winget`) empties
-  it at each logon. The keys sit on disk until then, so keep BitLocker on.
+  `%LOCALAPPDATA%\dotfiles\secrets`, readable only by you.
   `bw` keeps no session between runs, so each `sync-secrets` asks for the
-  master password.
+  master password; rbw caches its unlock, so Linux asks only after
+  `vault.rbw.lockTimeout` (8 h) or an expired login.
 
 `sync-secrets --check` (`-Check` on Windows) only runs the smoke tests.
 
@@ -301,7 +301,7 @@ elevation.
 - **Desktop**: Ditto (the CopyQ stand-in), ONLYOFFICE Desktop Editors, Everything.
 
 It also disables Windows' OpenSSH agent service, so Bitwarden's agent gets
-its pipe, and registers the logon task that empties the secrets folder. To add
+its pipe. To add
 a package, copy a `WinGetPackage` entry and change its ids (`winget search
 <name>`).
 

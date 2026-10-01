@@ -12,7 +12,8 @@ Resolve such values at runtime instead, following the existing pattern:
   `VAULT_URL` / `VAULT_EMAIL`)
 - what the machine already knows (`~/.config/rbw/config.json`, `git config
   user.email`, `ssh-add -L` from the Bitwarden agent)
-- secrets from Vaultwarden via `rbw`, fetched at runtime into tmpfs
+- secrets from Vaultwarden via `rbw`, fetched by `sync-secrets` into
+  `~/.local/share/dotfiles/secrets`
 
 When a value can't be found, the role skips with a pointer rather than failing.
 Before committing, grep the diff for anything that looks personal.

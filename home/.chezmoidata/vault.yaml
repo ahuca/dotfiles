@@ -9,9 +9,10 @@ vault:
   sshAgentSocket: ~/snap/bitwarden/current/.bitwarden-ssh-agent.sock
 
   # API keys that `sync-secrets` fetches (rbw on Linux, the Bitwarden CLI on
-  # Windows) into a directory that doesn't outlive the session: tmpfs on
-  # Linux, an owner-only folder cleared at logon on Windows. Nothing chezmoi
-  # renders holds a key; opencode reads them through {file:...}.
+  # Windows) into an owner-only directory in the user profile. The disk is
+  # encrypted (LUKS / BitLocker), so the keys persist on it between reboots
+  # until rotated or expired; exclude the directory from backups. Nothing
+  # chezmoi renders holds a key; opencode reads them through {file:...}.
   # folder is case-sensitive; field defaults to the password.
   # Check names with: rbw list --fields name,folder
   secrets:
@@ -27,5 +28,3 @@ vault:
     pinentry: pinentry-gnome3      # pinentry-curses when headless
     lockTimeout: 28800
     syncInterval: 3600             # 0 disables
-    # A systemd user unit that runs sync-secrets when the desktop session starts.
-    syncOnLogin: false

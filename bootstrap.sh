@@ -174,7 +174,7 @@ if [[ "$PLAYBOOK" == site.yml || "$PLAYBOOK" == *workstation.yml ]] \
 fi
 
 # --- secrets -----------------------------------------------------------
-# Log in and fill the tmpfs key files, so a fresh machine is one command.
+# Log in and fill the key files, so a fresh machine is one command.
 if [[ "$applied" -eq 1 && -t 0 && -x "$HOME/.local/bin/sync-secrets" ]] \
    && command -v rbw >/dev/null; then
   log "Logging in to Vaultwarden and refreshing secrets"
