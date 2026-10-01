@@ -35,7 +35,11 @@ properties:
       directives: { description: Bitwarden CLI for sync-secrets, allowPrerelease: true }
       # 2026.8+ runs a user key-id backfill on login, which needs the
       # /accounts/key-management/user-key-id endpoint (Vaultwarden PR #7693,
-      # 2026-09-18). Unpin once the Vaultwarden server is updated past that.
+      # in no stable release yet). Unpin this version together with
+      # `winget pin remove --id Bitwarden.CLI` once the server ships it.
+      # Existing machines on a newer CLI downgrade once, by hand (winget
+      # configure installs but never downgrades):
+      #   winget install --id Bitwarden.CLI --version 2026.7.0 --force
       settings: { id: Bitwarden.CLI, source: winget, version: 2026.7.0 }
 
     # ── dev tools ──────────────────────────────────────────────────
