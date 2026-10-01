@@ -156,8 +156,8 @@ gnome_extensions_disabled:
   - tiling-assistant@ubuntu.com
 
 # ── touchpad ────────────────────────────────────────────────────────
-# Forward the ASUS ProArt Studiobook touchpad's middle button, which the kernel
-# drops. Skips itself on machines without that touchpad.
+# Forward the middle button of touchpads whose kernel driver drops it.
+# Skips itself on machines without such a touchpad.
 touchpad_middle_button_enabled: true
 
 # ── shell ───────────────────────────────────────────────────────────
