@@ -16,6 +16,14 @@ if ($Host.Name -eq 'ConsoleHost') {
     Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
 
     if (Get-Command oh-my-posh -ErrorAction Ignore) {
-        oh-my-posh init pwsh | Invoke-Expression
+        # oh-my-posh dropped its built-in default config ("CONFIG NOT FOUND"
+        # in the prompt without one). Use the stock theme from its themes
+        # directory where it exists (winget installs it there), bare init else.
+        $theme = if ($env:POSH_THEMES_PATH) { Join-Path $env:POSH_THEMES_PATH 'jandedobbeleer.omp.json' }
+        if ($theme -and (Test-Path $theme)) {
+            oh-my-posh init pwsh --config $theme | Invoke-Expression
+        } else {
+            oh-my-posh init pwsh | Invoke-Expression
+        }
     }
 }

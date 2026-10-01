@@ -33,7 +33,10 @@ properties:
     - resource: Microsoft.WinGet.DSC/WinGetPackage
       id: bitwardencli
       directives: { description: Bitwarden CLI for sync-secrets, allowPrerelease: true }
-      settings: { id: Bitwarden.CLI, source: winget }
+      # 2026.8+ runs a user key-id backfill on login, which needs the
+      # /accounts/key-management/user-key-id endpoint (Vaultwarden PR #7693,
+      # 2026-09-18). Unpin once the Vaultwarden server is updated past that.
+      settings: { id: Bitwarden.CLI, source: winget, version: 2026.7.0 }
 
     # ── dev tools ──────────────────────────────────────────────────
     - resource: Microsoft.WinGet.DSC/WinGetPackage
