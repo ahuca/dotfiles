@@ -7,8 +7,9 @@
 # Fresh machine, nothing cloned yet (the built-in Windows PowerShell is fine):
 #   irm https://raw.githubusercontent.com/ahuca/dotfiles/main/bootstrap.ps1 | iex
 #
-# Run it as yourself, not as Administrator: winget raises its own UAC prompt
-# for machine-wide installers and the settings that need it.
+# Run it as yourself, not as Administrator: the winget configuration gets one
+# explicit UAC prompt (its machine-wide units run in an elevated child);
+# chezmoi and the secrets stay in your own profile.
 # Written for Windows PowerShell 5.1 too, since PowerShell 7 isn't there yet.
 # No param() block: `irm | iex` runs the text, not a script file.
 
@@ -52,11 +53,27 @@ if (-not $here -or -not (Test-Path (Join-Path $here 'windows\configuration.winge
 
 # --- packages and machine-wide settings ---------------------------------
 if (-not $SkipConfigure) {
-    Write-Step 'Applying windows\configuration.winget (UAC may ask once)'
-    winget configure --file (Join-Path $here 'windows\configuration.winget') `
-        --accept-configuration-agreements --disable-interactivity
-    if ($LASTEXITCODE) {
-        Write-Warning "winget configure reported a problem (exit $LASTEXITCODE); carrying on with what it installed. Re-run:  winget configure -f windows\configuration.winget"
+    Write-Step 'Applying windows\configuration.winget (accept the one UAC prompt)'
+    $config = Join-Path $here 'windows\configuration.winget'
+    # Machine-wide units need elevation, and winget otherwise raises UAC per
+    # installer mid-run, where a missed prompt silently stalls everything. One
+    # elevated child (its own console shows winget's progress) covers them all.
+    # powershell.exe, not pwsh: this step can run before pwsh is installed.
+    $command = 'winget configure --file ''{0}'' --accept-configuration-agreements --disable-interactivity' -f $config
+    try {
+        $elevated = Start-Process powershell.exe -Verb RunAs -Wait -PassThru `
+            -ArgumentList '-NoProfile', '-Command', $command
+        if ($elevated.ExitCode) {
+            Write-Warning "winget configure reported a problem (exit $($elevated.ExitCode)); carrying on with what it installed. Re-run:  winget configure -f windows\configuration.winget"
+        }
+    } catch {
+        # The UAC prompt was declined: fall back to the old per-package
+        # prompting rather than leaving a machine with no packages.
+        Write-Warning 'UAC prompt was declined; running unelevated (winget will ask per package).'
+        winget configure --file $config --accept-configuration-agreements --disable-interactivity
+        if ($LASTEXITCODE) {
+            Write-Warning "winget configure reported a problem (exit $LASTEXITCODE); carrying on with what it installed. Re-run:  winget configure -f windows\configuration.winget"
+        }
     }
     Update-SessionPath
 }
