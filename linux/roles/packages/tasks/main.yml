@@ -101,6 +101,25 @@
         creates: "{{ d2_bin }}"
       become: true
 
+# User-local (~/.local/bin, no sudo); ~/.zshrc already puts that on PATH.
+# --no-modify-path keeps the installer from duplicating that line elsewhere.
+- name: Install uv
+  when: uv_enabled | bool
+  tags: [uv]
+  block:
+    - name: Fetch the uv install script
+      ansible.builtin.get_url:
+        url: https://astral.sh/uv/install.sh
+        dest: /tmp/uv-install.sh
+        mode: "0755"
+      changed_when: false
+      check_mode: false
+
+    - name: Run the uv installer
+      ansible.builtin.command:
+        cmd: /tmp/uv-install.sh --no-modify-path
+        creates: "{{ target_home }}/.local/bin/uv"
+
 - name: Download the tldr pages
   ansible.builtin.command:
     cmd: tldr --update
