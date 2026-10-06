@@ -26,6 +26,8 @@ TARGETS = Gdk.Atom.intern("TARGETS", False)
 # Served by GTK itself, or not data at all.
 META = {"TIMESTAMP", "TARGETS", "MULTIPLE", "SAVE_TARGETS", "DELETE",
         "INSERT_SELECTION", "INSERT_PROPERTY"}
+# Data about the contents rather than the contents.
+HINTS = {"x-kde-passwordManagerHint"}
 
 
 def vmware_running():
@@ -93,30 +95,33 @@ class Bridge:
         ok, atoms = sd.get_targets()
         if gen != self.gen or not ok:
             return
-        self.fetch(gen, content_targets(atoms), [])
+        self.fetch(gen, content_targets(atoms), 0, [])
 
-    def fetch(self, gen, names, items):
+    def fetch(self, gen, names, i, items):
         # One request at a time: some owners (Bitwarden's) answer only the
         # last of several concurrent requests.
-        if len(items) == len(names):
+        if i == len(names):
             self.claim(items)
             return
-        name = names[len(items)]
         self.clipboard.request_contents(
-            Gdk.Atom.intern(name, False), self.on_data, (gen, names, items))
+            Gdk.Atom.intern(names[i], False), self.on_data, (gen, names, i, items))
 
     def on_data(self, _cb, sd, args):
-        gen, names, items = args
-        # Owner changed, or a format failed: leave it be rather than
-        # replace it with part of its contents.
-        if gen != self.gen or sd.get_length() < 0:
+        gen, names, i, items = args
+        # Owner changed: leave it be.
+        if gen != self.gen:
             return
-        # sd is freed when this returns; keep a copy.
-        items.append((names[len(items)], (sd.get_data_type(), sd.get_format(), sd.get_data())))
-        self.fetch(gen, names, items)
+        # Some owners list formats they refuse (Bitwarden's lists text/plain
+        # aliases of UTF8_STRING); serve only what they do serve.
+        if sd.get_length() >= 0:
+            # sd is freed when this returns; keep a copy.
+            items.append((names[i], (sd.get_data_type(), sd.get_format(), sd.get_data())))
+        self.fetch(gen, names, i + 1, items)
 
     def claim(self, items):
-        if not items:
+        # A hint alone isn't the contents: leave it be rather than replace
+        # the text with it.
+        if all(name in HINTS for name, _ in items):
             return
         Gtk.selection_clear_targets(self.widget, CLIPBOARD)
         self.served = []
