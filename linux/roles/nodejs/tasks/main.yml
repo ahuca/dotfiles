@@ -1,23 +1,51 @@
 ---
-- name: Install nvm
-  ansible.builtin.shell:
-    cmd: curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/{{ nvm_version }}/install.sh | bash
-    creates: "{{ target_home }}/.nvm/nvm.sh"
-  environment:
-    NVM_DIR: "{{ target_home }}/.nvm"
-    # ~/.zshrc (chezmoi) already loads nvm; don't append to it.
-    PROFILE: /dev/null
-  when: nvm_enabled | bool
+# fnm and pnpm come from Homebrew so topgrade keeps them current, and pnpm
+# no longer hangs off corepack, which Node stopped shipping from v25.
+- name: Install fnm and pnpm
+  community.general.homebrew:
+    name: [fnm, pnpm]
+    state: present
+    path: "{{ homebrew_prefix }}/bin"
+  when: node_enabled | bool
 
+# ~/.zshrc (chezmoi) loads fnm; nothing is appended to shell startup files.
 - name: Install node and make it the default in new shells
   ansible.builtin.shell:
     cmd: |
       set -euo pipefail
-      . "$NVM_DIR/nvm.sh"
-      nvm install {{ nvm_node_version }}
-      nvm alias default '{{ nvm_default_alias }}'
-    creates: "{{ target_home }}/.nvm/alias/default"
+      fnm install {{ node_version }}
+      fnm default {{ node_default_alias }}
+    creates: "{{ target_home }}/.local/share/fnm/aliases/default"
     executable: /bin/bash
   environment:
-    NVM_DIR: "{{ target_home }}/.nvm"
-  when: nvm_enabled | bool
+    PATH: "{{ homebrew_prefix }}/bin:{{ ansible_env.PATH }}"
+  when: node_enabled | bool
+
+# ~/.zshrc (chezmoi) loads it too.
+- name: Load fnm into future bash sessions
+  ansible.builtin.blockinfile:
+    path: "{{ target_home }}/.bashrc"
+    create: true
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED — fnm env"
+    block: |
+      command -v fnm >/dev/null && eval "$(fnm env --use-on-cd --shell bash)"
+  when: node_enabled | bool
+
+# fnm replaced nvm; drop it with the node versions and globals it held, the
+# lines its installer added to ~/.bashrc, and corepack's cached pnpm.
+- name: Remove nvm and corepack's cache
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ target_home }}/.nvm"
+    - "{{ target_home }}/.cache/node/corepack"
+  when: node_enabled | bool
+
+- name: Stop ~/.bashrc loading nvm
+  ansible.builtin.lineinfile:
+    path: "{{ target_home }}/.bashrc"
+    regexp: 'NVM_DIR'
+    state: absent
+  when: node_enabled | bool

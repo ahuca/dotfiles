@@ -114,8 +114,8 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 | `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); Ctrl+Alt+Space to switch the keyboard layout (`wm_switch_input_source_bindings`); opt-in `< > \|` on the key left of 1 (`xkb_lsgt_on_tlde`); GNOME Shell extensions from extensions.gnome.org (`gnome_extensions`: Tiling Shell, replacing Ubuntu's Tiling Assistant; loads at next login) |
 | `touchpad` | ASUS ProArt Studiobook touchpad: a root service that forwards the physical middle button the kernel drops (only where that touchpad is present; see below) |
 | `shell`    | oh-my-zsh and the plugins it doesn't bundle (fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting); zsh as the login shell. `~/.zshrc` itself comes from chezmoi |
-| `nodejs`   | nvm + latest LTS node, set as the default                                     |
 | `homebrew` | Linuxbrew + `opencode` (which pulls in ripgrep) + `chezmoi`                   |
+| `nodejs`   | fnm + pnpm from Homebrew, latest LTS node as fnm's default; removes a leftover nvm (`~/.nvm`, its `~/.bashrc` lines, corepack's cache) |
 
 #### Three notes on how packages are sourced
 

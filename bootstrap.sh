@@ -49,8 +49,8 @@ sudo -k -n true 2>/dev/null && SUDO_NOPASSWD=1
 
 # Ask once: validating warms the ticket for this script's own sudo calls, and
 # the same password goes to Ansible via a pipe (never argv, env or disk).
-# Not ANSIBLE_BECOME_PASS: every unprivileged task, nvm's and Homebrew's
-# downloaded installers included, would inherit it.
+# Not ANSIBLE_BECOME_PASS: every unprivileged task, Homebrew's and fnm's
+# downloads included, would inherit it.
 SUDO_PASS=""
 if [[ "$SUDO_NOPASSWD" -eq 0 ]]; then
   [[ -t 0 ]] || die "sudo needs a password, but there is no terminal to ask on."

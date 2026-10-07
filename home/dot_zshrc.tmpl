@@ -13,16 +13,15 @@ source $ZSH/oh-my-zsh.sh
 # Grey suggestion from history (→ accepts), else from completion.
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+[ -x /home/linuxbrew/.linuxbrew/bin/brew ] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+# Node from fnm (brew); switches on cd into a dir with .nvmrc/.node-version.
+command -v fnm >/dev/null && eval "$(fnm env --use-on-cd --shell zsh)"
 
 # What `pnpm setup` would append here; pnpm refuses global commands
 # (`pnpm root -g`, topgrade's pnpm step) while its global bin isn't on PATH.
 export PNPM_HOME="$HOME/.local/share/pnpm"
 export PATH="$PNPM_HOME/bin:$PATH"
-
-[ -x /home/linuxbrew/.linuxbrew/bin/brew ] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 # Every SSH key lives in Bitwarden's agent.
 export SSH_AUTH_SOCK="{{ .vault.sshAgentSocket | replace "~" "$HOME" }}"

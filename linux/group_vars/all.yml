@@ -186,10 +186,10 @@ docker_enabled: true
 docker_users: ["{{ target_user }}"]
 
 # ── node ────────────────────────────────────────────────────────────
-nvm_enabled: true
-nvm_version: v0.40.1
-nvm_node_version: "--lts"     # "node" for newest Current
-nvm_default_alias: "lts/*"
+# fnm + pnpm from Homebrew, so this needs homebrew_enabled.
+node_enabled: true
+node_version: "--lts"         # "--latest" for newest Current
+node_default_alias: lts-latest
 
 # ── homebrew ────────────────────────────────────────────────────────
 homebrew_enabled: true

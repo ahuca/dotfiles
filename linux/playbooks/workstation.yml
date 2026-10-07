@@ -18,10 +18,11 @@
       tags: [touchpad]
     - role: shell
       tags: [shell]
-    - role: nodejs
-      tags: [node]
     - role: homebrew
       tags: [brew]
+    # Installs fnm and pnpm with brew.
+    - role: nodejs
+      tags: [node]
 
   post_tasks:
     - name: Wrap up
