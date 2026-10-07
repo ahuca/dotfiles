@@ -321,8 +321,9 @@ elevation.
 
 - **Shell**: PowerShell 7, Windows Terminal, Oh My Posh.
 - **Dotfiles and secrets**: chezmoi, Bitwarden, Bitwarden CLI.
-- **Dev tools**: Git, GitHub CLI, delta, lazygit, ripgrep, fzf, fd, Neovim, glow,
-  tealdeer, 7-Zip, topgrade, Node.js LTS, VS Code, Claude Code, opencode, uv
+- **Dev tools**: Git, GitHub CLI, delta, lazygit, ripgrep, fzf, fd, Neovim
+  (and WinLibs GCC, which builds its tree-sitter parsers), glow, tealdeer,
+  7-Zip, topgrade, Node.js LTS, VS Code, Claude Code, opencode, uv
   (opencode's Atlassian MCP runs under `uvx`).
 - **Desktop**: Ditto (the CopyQ stand-in), ONLYOFFICE Desktop Editors, Everything.
 

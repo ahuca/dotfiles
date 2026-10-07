@@ -69,12 +69,16 @@ properties:
       settings: { id: junegunn.fzf, source: winget }
     - resource: Microsoft.WinGet.DSC/WinGetPackage
       id: fd
-      directives: { description: fd, LazyVim's file finder, allowPrerelease: true }
+      directives: { description: fd (LazyVim's file finder), allowPrerelease: true }
       settings: { id: sharkdp.fd, source: winget }
     - resource: Microsoft.WinGet.DSC/WinGetPackage
       id: neovim
       directives: { description: Neovim, allowPrerelease: true }
       settings: { id: Neovim.Neovim, source: winget }
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: winlibs
+      directives: { description: WinLibs GCC (builds Neovim's tree-sitter parsers), allowPrerelease: true }
+      settings: { id: BrechtSanders.WinLibs.POSIX.UCRT, source: winget }
     - resource: Microsoft.WinGet.DSC/WinGetPackage
       id: glow
       directives: { description: glow, Markdown in the terminal, allowPrerelease: true }
