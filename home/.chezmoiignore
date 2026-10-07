@@ -10,6 +10,7 @@ AppData
 .local/bin/sync-secrets
 .config/ghostty
 .config/lazygit
+.config/nvim
 .config/rbw
 .config/systemd
 {{- end }}

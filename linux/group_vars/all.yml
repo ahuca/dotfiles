@@ -98,6 +98,8 @@ apt_packages:
   - ghostty
   - zsh
   - fzf
+  - fd-find # fdfind; LazyVim's file picker prefers it
+  - python3-venv # mason installs Python tools (ansible-lint) into venvs
   - glow
   - lazygit
   - git-delta

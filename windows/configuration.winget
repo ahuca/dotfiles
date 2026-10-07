@@ -68,6 +68,10 @@ properties:
       directives: { description: fzf, allowPrerelease: true }
       settings: { id: junegunn.fzf, source: winget }
     - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: fd
+      directives: { description: fd, LazyVim's file finder, allowPrerelease: true }
+      settings: { id: sharkdp.fd, source: winget }
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
       id: neovim
       directives: { description: Neovim, allowPrerelease: true }
       settings: { id: Neovim.Neovim, source: winget }

@@ -10,8 +10,9 @@ Three layers, one repo:
   the few machine-wide settings, applied with `winget configure`.
 - **`home/`** holds the dotfiles for both, applied with
   [chezmoi](https://www.chezmoi.io/): git and its per-remote profiles, SSH,
-  delta and lazygit, zsh / PowerShell, Ghostty / Windows Terminal, and the
-  Vaultwarden secrets plumbing. Templates pick the right variant per OS.
+  delta and lazygit, Neovim (LazyVim), zsh / PowerShell, Ghostty / Windows
+  Terminal, and the Vaultwarden secrets plumbing. Templates pick the right
+  variant per OS.
 
 ```
 bootstrap.sh          Linux: installs Ansible, runs site.yml, then chezmoi
@@ -207,6 +208,7 @@ machine-only additions in the local files the managed ones read:
 | `~/.ssh/config`, `~/.ssh/git-profiles/*.pub` — one Bitwarden key per profile host | ✓ | ✓ |
 | lazygit (delta as its pager) — `~/.config/lazygit/` / `%LOCALAPPDATA%\lazygit\` | ✓ | ✓ |
 | `~/.config/opencode/opencode.jsonc` — keys by `{file:}` reference | ✓ | ✓ |
+| Neovim's LazyVim config — `~/.config/nvim/` / `%LOCALAPPDATA%\nvim\` (see [Neovim](#neovim-lazyvim)) | ✓ | ✓ |
 | `sync-secrets` — `~/.local/bin/sync-secrets` / `sync-secrets.ps1` | rbw | bw |
 | `~/.config/powershell/profile.ps1` — history suggestions, menu Tab, Oh My Posh | ✓ | ✓ |
 | `~/.zshrc`, rbw's config, Ghostty's config | ✓ | |
@@ -217,6 +219,30 @@ platform doesn't use. Shared pieces live in `home/.chezmoitemplates/`, and
 repo data in `home/.chezmoidata/vault.yaml`: everything from the vault (the
 secrets list, rbw's settings, the SSH agent socket) under one `vault` key,
 merged with the per-machine `vault.url` / `vault.email`.
+
+### Neovim (LazyVim)
+
+`home/private_dot_config/nvim/` is the [LazyVim](https://www.lazyvim.org/)
+config; on Windows each file under `home/AppData/Local/nvim/` is a one-line
+stub that renders the same source as its Linux twin, so a new file there
+needs a stub too. The first `nvim` clones lazy.nvim, then LazyVim and its
+plugins; mason installs the LSP servers and tools it is missing (the
+npm-based ones need node, so start it from a shell that loaded fnm). Add
+servers in `lua/plugins/lsp.lua` rather than through `:Mason`, so every
+machine gets them.
+
+`lua/config/lazy.lua` imports the extras for what this repo holds: Ansible,
+YAML (`.winget` files are YAML too, see `options.lua`), JSON, Markdown, TOML,
+Python, and chezmoi. That last one highlights the templates here, through
+`lua/plugins/chezmoi.lua`, which is rendered from
+`home/.chezmoitemplates/nvim-chezmoi.lua` with the machine's source path
+(the extra assumes `~/.local/share/chezmoi`). Templates get no LSP.
+
+Two files stay out of the repo because Neovim rewrites them:
+`lazy-lock.json` (plugin versions; `:Lazy update`, the update checker and
+topgrade move it forward) and `lazyvim.json` (LazyVim's news and migration
+state). That second one is also where `:LazyExtras` saves extras, so add an
+extra as another import in `lazy.lua` instead.
 
 ### Per-machine values
 
@@ -295,7 +321,7 @@ elevation.
 
 - **Shell**: PowerShell 7, Windows Terminal, Oh My Posh.
 - **Dotfiles and secrets**: chezmoi, Bitwarden, Bitwarden CLI.
-- **Dev tools**: Git, GitHub CLI, delta, lazygit, ripgrep, fzf, Neovim, glow,
+- **Dev tools**: Git, GitHub CLI, delta, lazygit, ripgrep, fzf, fd, Neovim, glow,
   tealdeer, 7-Zip, topgrade, Node.js LTS, VS Code, Claude Code, opencode, uv
   (opencode's Atlassian MCP runs under `uvx`).
 - **Desktop**: Ditto (the CopyQ stand-in), ONLYOFFICE Desktop Editors, Everything.
