@@ -8,8 +8,14 @@ changes, so text copied in a Wayland app never reaches the guest (guest to
 host still works). While VMware runs, this takes each such clipboard over
 as an X11 owner that serves TIMESTAMP; mutter mirrors it back to Wayland.
 https://gitlab.gnome.org/GNOME/mutter/-/work_items/1265
+
+VMware's own clipboard of folders copied out of a guest is broken: every
+target is the same file list, its paths missing the staging dir, and either
+without the copy line Nautilus needs (one folder) or with a line before it
+(several). That one is taken over too, with the list fixed.
 """
 import os
+import urllib.parse
 
 os.environ["GDK_BACKEND"] = "x11"  # an X11 client is the whole point
 
@@ -28,6 +34,9 @@ META = {"TIMESTAMP", "TARGETS", "MULTIPLE", "SAVE_TARGETS", "DELETE",
         "INSERT_SELECTION", "INSERT_PROPERTY"}
 # Data about the contents rather than the contents.
 HINTS = {"x-kde-passwordManagerHint"}
+GNOME_FILES = "x-special/gnome-copied-files"
+# Where VMware stages files copied out of a guest.
+STAGING = "/tmp/VMwareDnD"
 
 
 def vmware_running():
@@ -48,6 +57,43 @@ def content_targets(atoms):
     images = [n for n in names if n.startswith("image/")]
     keep = "image/png" if "image/png" in images else images[:1]
     return [n for n in names if not n.startswith("image/") or n in keep]
+
+
+def staged_paths(text):
+    """The paths of a VMware file list Nautilus can't read, else None."""
+    lines = [line.rstrip("\r") for line in text.split("\n") if line.rstrip("\r")]
+    # Several folders come as Nautilus's old text/plain clipboard: this line,
+    # then copy, then the files.
+    if lines[:1] == ["x-special/nautilus-clipboard"]:
+        lines = lines[1:]
+        readable = False
+    else:
+        readable = lines[:1] in (["copy"], ["cut"])
+    if lines[:1] in (["copy"], ["cut"]):
+        lines = lines[1:]
+    paths = []
+    for line in lines:
+        if not line.startswith("file:"):
+            return None
+        path = urllib.parse.unquote(urllib.parse.urlparse(line).path)
+        # Don't wait for the path to exist: VMware lists everything before
+        # it has copied it out of the guest, which takes a while for big ones.
+        if not path.startswith(STAGING + "/") and not os.path.exists(path):
+            path = STAGING + path
+            readable = False
+        paths.append(path)
+    return None if readable or not paths else paths
+
+
+def file_list(paths):
+    """Clipboard items for paths, in the formats file managers read."""
+    uris = [GLib.filename_to_uri(p, None) for p in paths]
+    texts = {GNOME_FILES: "copy\n" + "\n".join(uris),
+             "text/uri-list": "".join(u + "\r\n" for u in uris),
+             "UTF8_STRING": "\n".join(paths),
+             "text/plain;charset=utf-8": "\n".join(paths)}
+    return [(name, (Gdk.Atom.intern(name, False), 8, text.encode()))
+            for name, text in texts.items()]
 
 
 class Bridge:
@@ -87,9 +133,28 @@ class Bridge:
         self.clipboard.request_contents(TIMESTAMP, self.on_timestamp, self.gen)
 
     def on_timestamp(self, _cb, sd, gen):
-        # A real X11 owner (VMware itself, an X11 app) answers; leave it be.
-        if gen == self.gen and sd.get_length() < 0:
+        if gen != self.gen:
+            return
+        if sd.get_length() < 0:
             self.clipboard.request_contents(TARGETS, self.on_targets, gen)
+        else:
+            # A real X11 owner (VMware itself, an X11 app) answers; leave it
+            # be, unless it's VMware's broken folder list.
+            self.clipboard.request_contents(TARGETS, self.on_owner_targets, gen)
+
+    def on_owner_targets(self, _cb, sd, gen):
+        ok, atoms = sd.get_targets()
+        names = {a.name() for a in atoms} if ok else set()
+        if gen == self.gen and {"vmware-target", GNOME_FILES} <= names:
+            self.clipboard.request_contents(
+                Gdk.Atom.intern(GNOME_FILES, False), self.on_vmware_files, gen)
+
+    def on_vmware_files(self, _cb, sd, gen):
+        if gen != self.gen or sd.get_length() < 0:
+            return
+        paths = staged_paths(bytes(sd.get_data()).decode(errors="replace"))
+        if paths:
+            self.claim(file_list(paths))
 
     def on_targets(self, _cb, sd, gen):
         ok, atoms = sd.get_targets()

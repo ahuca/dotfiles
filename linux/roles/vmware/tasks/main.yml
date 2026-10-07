@@ -5,6 +5,7 @@
 #   host eats Super/Alt+Tab etc. in the guest -> --tags keyboard (Xwayland grabs)
 #   guest mouse glitches, mixed-scale monitors -> --tags scaling (Xwayland 1x)
 #   host -> guest copy/paste does nothing      -> --tags clipboard (TIMESTAMP)
+#   guest folders won't paste in Nautilus      -> --tags clipboard (file list)
 #   just diagnose                             -> --tags status
 - name: Diagnose the current state
   ansible.builtin.import_tasks: status.yml

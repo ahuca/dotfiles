@@ -1,5 +1,5 @@
 ---
-# Host -> guest copy/paste under GNOME Wayland.
+# Host -> guest copy/paste under GNOME Wayland, and guest -> host folders.
 #
 # mutter's Xwayland clipboard bridge lists a TIMESTAMP target but never serves
 # it (`xclip -o -selection clipboard -t TIMESTAMP` fails after a copy in a
@@ -16,6 +16,12 @@
 # https://gitlab.gnome.org/GNOME/mutter/-/work_items/1265 (drop this once
 # fixed). Off-the-shelf Wayland<->X11 clipboard syncers need wlr/ext-data-control,
 # which mutter does not implement.
+# Folders copied in a guest are staged under /tmp/VMwareDnD/<id>/, but VMware
+# serves the same list for every target, its paths missing the staging dir:
+# one folder as a bare file:/<id>/<name> with no copy line, several after an
+# x-special/nautilus-clipboard line. Nautilus refuses both ("must begin with
+# cut or copy"). The bridge takes that clipboard over too, with the list
+# fixed; files alone come through right and are left alone.
 - name: Check for PyGObject with GTK 3
   ansible.builtin.command: python3 -c 'import gi; gi.require_version("Gtk", "3.0"); gi.require_version("GdkX11", "3.0")'
   register: _clip_gi

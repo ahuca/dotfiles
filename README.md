@@ -388,7 +388,7 @@ ansible-playbook playbooks/vmware.yml -K --tags perms -e vmware_vm_dir=~/vmware/
 ansible-playbook playbooks/vmware.yml -K --tags status                    # diagnose only
 ansible-playbook playbooks/vmware.yml --tags keyboard                     # forward host hotkeys to the guest
 ansible-playbook playbooks/vmware.yml --tags scaling                      # draw VMware at 1x under Xwayland
-ansible-playbook playbooks/vmware.yml --tags clipboard                    # host -> guest copy/paste on Wayland
+ansible-playbook playbooks/vmware.yml --tags clipboard                    # copy/paste fixes on Wayland
 ```
 
 Which tag fixes what:
@@ -401,6 +401,7 @@ Which tag fixes what:
 | Host eats Super / Alt+Tab instead of the guest | `keyboard` |
 | Guest mouse glitches with mixed-scale monitors | `scaling` |
 | Host → guest copy/paste does nothing (guest → host works) | `clipboard` |
+| Folders copied in the guest won't paste in Nautilus | `clipboard` |
 
 MOK enrollment cannot be fully automated — it needs the blue **MOK Management**
 screen at boot. The playbook queues the request and stops; reboot, choose
@@ -414,6 +415,14 @@ Wayland app reaches the guest ([mutter#1265](https://gitlab.gnome.org/GNOME/mutt
 While VMware runs, the service re-owns each such clipboard as an X11 client that
 does serve it. Ready-made Wayland⇄X11 clipboard syncers don't work here: they
 need a data-control protocol that mutter doesn't implement.
+
+The service also fixes folders copied out of a guest. VMware stages them under
+`/tmp/VMwareDnD/<id>/`, but serves the same list for every target with the
+staging dir left out of the paths: one folder as a bare `file:/<id>/<name>`
+without the `copy` line Nautilus needs, several after an
+`x-special/nautilus-clipboard` line. Nautilus refuses both ("Nautilus Clipboard
+must begin with “cut” or “copy”"). The service takes that clipboard over with
+the list fixed. Files alone come through right and are left alone.
 
 Never run `vmware-modconfig --install-all` after signing — it rebuilds the
 modules unsigned and silently undoes the signing.
