@@ -1,4 +1,6 @@
 partial alphanumeric_keys
-xkb_symbols "lsgt_on_tlde" {
-    key <TLDE> { [ less, greater, bar, section ] };
+xkb_symbols "lsgt_on_altgr" {
+    key <AB08> { [ comma,  semicolon,  less,    leftsinglequotemark ] };
+    key <AB09> { [ period, colon,      greater, dead_abovedot       ] };
+    key <AB10> { [ minus,  underscore, bar,     dead_belowcomma     ] };
 };

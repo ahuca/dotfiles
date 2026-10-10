@@ -129,17 +129,17 @@
     dest: "{{ target_home }}/.config/xkb/"
     mode: "0644"
     directory_mode: "0755"
-  when: xkb_lsgt_on_tlde | bool
+  when: xkb_lsgt_on_altgr | bool
   tags: [keyboard, gnome]
 
 - name: Enable the custom XKB option in GNOME
   when:
-    - xkb_lsgt_on_tlde | bool
+    - xkb_lsgt_on_altgr | bool
     - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
   tags: [keyboard, gnome]
   vars:
     _xkb_key: /org/gnome/desktop/input-sources/xkb-options
-    _xkb_option: custom:lsgt_on_tlde
+    _xkb_option: custom:lsgt_on_altgr
   block:
     - name: Read the existing XKB options
       community.general.dconf:
@@ -147,20 +147,23 @@
         state: read
       register: _xkb_opts
 
+    # custom: options all come from our rules file, so any other one is a
+    # retired name of ours and is dropped; everything else is preserved.
     - name: Add our option, preserving any others
       community.general.dconf:
         key: "{{ _xkb_key }}"
-        value: "{{ (_xkb_existing + [_xkb_option]) | unique | to_json }}"
+        value: "{{ _xkb_wanted | to_json }}"
         state: present
       vars:
         _xkb_existing: "{{ _xkb_opts.value | default('', true) | regex_findall(\"'([^']+)'\") }}"
-      when: _xkb_option not in _xkb_existing
+        _xkb_wanted: "{{ _xkb_existing | reject('match', 'custom:') | list + [_xkb_option] }}"
+      when: _xkb_wanted != _xkb_existing
 
 - name: Note the skipped XKB option
   ansible.builtin.debug:
     msg: No D-Bus session bus — re-run from your desktop session with --tags keyboard
   when:
-    - xkb_lsgt_on_tlde | bool
+    - xkb_lsgt_on_altgr | bool
     - ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is not defined
   tags: [keyboard, gnome]
 
