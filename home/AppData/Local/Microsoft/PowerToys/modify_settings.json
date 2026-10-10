@@ -1,0 +1,9 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /* PowerToys rewrites its own settings.json, so chezmoi only switches
+       Keyboard Manager on (it ships disabled) and keeps the rest. Takes
+       effect when PowerToys next starts. */ -}}
+{{- $settings := dict -}}
+{{- $in := .chezmoi.stdin | trimPrefix "﻿" -}}
+{{- if trim $in }}{{ $settings = fromJson $in }}{{ end -}}
+{{- $settings = setValueAtPath (list "enabled" "Keyboard Manager") true $settings -}}
+{{ toPrettyJson "    " $settings }}

@@ -1,0 +1,33 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /* < > | on AltGr+, AltGr+. AltGr+-, for keyboards without the key left
+       of Z: the counterpart of the Linux desktop role's XKB option. Typed as
+       text, so the layout doesn't matter. Keyboard Manager's editor rewrites
+       this file, so chezmoi only owns these three remaps (by their keys) and
+       keeps the rest. PowerToys reads it when it starts. */ -}}
+{{- /* Virtual-key codes: AltGr is LCtrl (162) + RAlt (165); comma 188,
+       minus 189, period 190. */ -}}
+{{- $ours := list
+      (dict "originalKeys" "162;165;188" "unicodeText" "<")
+      (dict "originalKeys" "162;165;190" "unicodeText" ">")
+      (dict "originalKeys" "162;165;189" "unicodeText" "|") -}}
+{{- $oursKeys := list -}}
+{{- range $ours }}{{ $oursKeys = append $oursKeys .originalKeys }}{{ end -}}
+
+{{- $config := dict -}}
+{{- $in := .chezmoi.stdin | trimPrefix "﻿" -}}
+{{- if trim $in }}{{ $config = fromJson $in }}{{ end -}}
+
+{{- $global := list -}}
+{{- range dig "remapShortcutsToText" "global" (list) $config }}
+{{-   if not (has .originalKeys $oursKeys) }}{{ $global = append $global . }}{{ end }}
+{{- end -}}
+{{- $config = setValueAtPath "remapShortcutsToText.global" (concat $global $ours) $config -}}
+
+{{- /* The other lists the editor writes, so a fresh file looks like its own. */ -}}
+{{- range $path := list "remapKeys.inProcess" "remapKeysToText.inProcess" "remapShortcuts.global" "remapShortcuts.appSpecific" "remapShortcutsToText.appSpecific" }}
+{{-   $parts := splitList "." $path }}
+{{-   if not (hasKey (dig (index $parts 0) (dict) $config) (index $parts 1)) }}
+{{-     $config = setValueAtPath $path (list) $config }}
+{{-   end }}
+{{- end -}}
+{{ toPrettyJson "    " $config }}

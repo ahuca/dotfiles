@@ -54,6 +54,14 @@ sourceDir = {{ .chezmoi.workingTree | replace "\\" "/" | quote }}
 [data.vault]
     url = {{ promptStringOnce . "vault.url" "Vaultwarden URL (Enter to skip secrets)" $vaultUrl | quote }}
     email = {{ promptStringOnce . "vault.email" "Vaultwarden login email" $vaultEmail | quote }}
+{{- if eq .chezmoi.os "windows" }}
+
+# < > | on AltGr+, AltGr+. AltGr+- through PowerToys' Keyboard Manager, for
+# keyboards without the key left of Z (on Linux: the desktop role's
+# xkb_lsgt_on_altgr).
+[data.keyboard]
+    lsgtOnAltgr = {{ promptBoolOnce . "keyboard.lsgtOnAltgr" "Put < > | on AltGr+, . - (keyboard without the key left of Z)" false }}
+{{- end }}
 
 # Git profiles: a repo whose remote is git@<host>:... (narrowed to <owner>/...
 # if set) gets that profile's user.email and signing key. Empty host or email

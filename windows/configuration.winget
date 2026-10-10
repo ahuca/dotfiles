@@ -129,6 +129,10 @@ properties:
       id: everything
       directives: { description: Everything file search, allowPrerelease: true }
       settings: { id: voidtools.Everything, source: winget }
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: powertoys
+      directives: { description: PowerToys (Keyboard Manager puts < > | on AltGr if opted in), allowPrerelease: true }
+      settings: { id: Microsoft.PowerToys, source: winget }
 
     # ── machine-wide settings (one UAC prompt; winget 1.10.280 or later) ──
     # Bitwarden's SSH agent listens on OpenSSH's own pipe

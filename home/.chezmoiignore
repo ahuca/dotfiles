@@ -14,6 +14,10 @@ AppData
 .config/rbw
 .config/systemd
 {{- end }}
+{{- if not (dig "keyboard" "lsgtOnAltgr" false .) }}
+# < > | on AltGr is opt-in.
+AppData/Local/Microsoft/PowerToys
+{{- end }}
 {{- if not (and .vault.url .vault.email) }}
 # No vault: no secrets plumbing.
 .config/rbw

@@ -1,0 +1,16 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /* The engine loads no remaps until this names the active config
+       (default.json); PowerToys only writes it once its settings page is
+       opened, so chezmoi seeds the missing keys and keeps the rest. */ -}}
+{{- $settings := dict -}}
+{{- $in := .chezmoi.stdin | trimPrefix "﻿" -}}
+{{- if trim $in }}{{ $settings = fromJson $in }}{{ end -}}
+{{- if not (hasKey $settings "name") }}{{ $settings = set $settings "name" "Keyboard Manager" }}{{ end -}}
+{{- if not (hasKey $settings "version") }}{{ $settings = set $settings "version" "1" }}{{ end -}}
+{{- if not (dig "properties" "activeConfiguration" "value" "" $settings) }}
+{{-   $settings = setValueAtPath "properties.activeConfiguration.value" "default" $settings }}
+{{- end -}}
+{{- if not (dig "properties" "keyboardConfigurations" "value" (list) $settings) }}
+{{-   $settings = setValueAtPath "properties.keyboardConfigurations.value" (list "default") $settings }}
+{{- end -}}
+{{ toPrettyJson "    " $settings }}

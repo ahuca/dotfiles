@@ -213,6 +213,7 @@ machine-only additions in the local files the managed ones read:
 | `~/.config/powershell/profile.ps1` — history suggestions, menu Tab, Oh My Posh | ✓ | ✓ |
 | `~/.zshrc`, rbw's config, Ghostty's config | ✓ | |
 | Windows Terminal (PowerShell 7 default, CaskaydiaCove Nerd Font), the Nerd Font itself | | ✓ |
+| PowerToys Keyboard Manager — opt-in `< > \|` on AltGr+`,` `.` `-` (Linux: the `desktop` role's `xkb_lsgt_on_altgr`) | | ✓ |
 
 Templates branch on `.chezmoi.os`; `home/.chezmoiignore` drops what a
 platform doesn't use. Shared pieces live in `home/.chezmoitemplates/`, and
@@ -257,6 +258,7 @@ off.
 | git `user.name` / `user.email` | `GIT_NAME` / `GIT_EMAIL`, else `git config --global` |
 | Vaultwarden URL and login | `VAULT_URL` / `VAULT_EMAIL` (or the older `RBW_BASE_URL` / `RBW_EMAIL`), else `~/.config/rbw/config.json` |
 | each git profile's host, owner and email | `GIT_PERSONAL_HOST` / `_OWNER` / `_EMAIL` (and `GIT_WORK_*`), else the files the old git role wrote |
+| Windows only: `< > \|` on AltGr+`,` `.` `-`, for a keyboard without the key left of Z | nothing; defaults to no |
 
 Without a terminal, `chezmoi init --promptDefaults` takes the defaults.
 
@@ -325,7 +327,8 @@ elevation.
   (and WinLibs GCC, which builds its tree-sitter parsers), glow, tealdeer,
   7-Zip, topgrade, Node.js LTS, VS Code, Claude Code, opencode, uv
   (opencode's Atlassian MCP runs under `uvx`).
-- **Desktop**: Ditto (the CopyQ stand-in), ONLYOFFICE Desktop Editors, Everything.
+- **Desktop**: Ditto (the CopyQ stand-in), ONLYOFFICE Desktop Editors, Everything,
+  PowerToys.
 
 It also disables Windows' OpenSSH agent service, so Bitwarden's agent gets
 its pipe. To add
@@ -339,6 +342,10 @@ After the run:
 - Open a new Windows Terminal: PowerShell 7 is the default profile, with Oh My
   Posh's default theme in CaskaydiaCove Nerd Font. `oh-my-posh init pwsh
   --config <theme>` in `~\.config\powershell\profile.ps1` picks another.
+- If you answered yes to `< > |` on AltGr, restart PowerToys (tray icon →
+  Exit, then start it again): it reads the Keyboard Manager remaps chezmoi
+  wrote only at startup. They don't reach apps running as Administrator
+  unless PowerToys runs elevated too.
 
 Not tested on real Windows yet: the WinGet file, the scripts and the templates
 were only parsed, and rendered on Linux with the OS switched.
