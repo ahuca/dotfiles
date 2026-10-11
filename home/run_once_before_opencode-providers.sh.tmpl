@@ -1,0 +1,25 @@
+{{- /*
+  Seed ~/.config/opencode/providers.jsonc from the tracked default
+  (home/.chezmoitemplates/opencode-providers.jsonc): on a machine's first
+  apply, or again when OPENCODE_RESEED is set. Setting that variable also
+  changes this script's rendered contents (the comment below), which is how
+  chezmoi is told to re-run an already-run run_once script — but chezmoi
+  skips scripts whose rendered contents it has run before, so the value must
+  be fresh each time: OPENCODE_RESEED=$(date +%s) chezmoi apply. It runs
+  before the config files render, so the re-seed is rendered into
+  opencode.jsonc by the same apply. Like .chezmoiignore's opencode entries,
+  skipped without a vault; the ps1 twin covers Windows.
+*/ -}}
+{{- if and (ne .chezmoi.os "windows") .vault.url .vault.email -}}
+#!/bin/sh
+# OPENCODE_RESEED={{ env "OPENCODE_RESEED" }}
+set -eu
+file="$HOME/.config/opencode/providers.jsonc"
+if [ -e "$file" ] && [ -z "${OPENCODE_RESEED:-}" ]; then
+    exit 0
+fi
+mkdir -p "$(dirname "$file")"
+cat >"$file" <<'JSONC'
+{{ include ".chezmoitemplates/opencode-providers.jsonc" -}}
+JSONC
+{{- end -}}

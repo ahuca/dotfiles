@@ -1,0 +1,22 @@
+{{- /*
+  The Windows twin of run_once_before_opencode-providers.sh.tmpl, which
+  documents the behaviour. Rendered empty on other platforms; pwsh writes
+  UTF-8 without a BOM.
+*/ -}}
+{{- if eq .chezmoi.os "windows" -}}
+# OPENCODE_RESEED={{ env "OPENCODE_RESEED" }}
+$ErrorActionPreference = 'Stop'
+# Seeds ~/.config/opencode/providers.jsonc from the tracked default; setting
+# $env:OPENCODE_RESEED to a fresh value (e.g. (Get-Date).Ticks) forces a
+# re-seed. The value must differ from the last reseed's: chezmoi skips
+# run_once scripts whose rendered contents it has already run, and the value
+# is baked into the rendered script exactly to change them.
+$file = Join-Path $HOME '.config/opencode/providers.jsonc'
+if ((Test-Path $file) -and -not $env:OPENCODE_RESEED) {
+    exit 0
+}
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $file) | Out-Null
+@'
+{{ include ".chezmoitemplates/opencode-providers.jsonc" -}}
+'@ | Set-Content -Path $file -Encoding utf8
+{{- end -}}

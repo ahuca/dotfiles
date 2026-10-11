@@ -158,7 +158,9 @@ if [[ "$PLAYBOOK" == site.yml || "$PLAYBOOK" == *workstation.yml ]] \
     fi
   else
     log "Applying the dotfiles in home/ with chezmoi"
-    init_args=(--apply --source "$REPO_DIR")
+    # --less-interactive: also ask before taking over files that already
+    # exist but aren't chezmoi's yet (a re-run on a configured machine).
+    init_args=(--apply --less-interactive --source "$REPO_DIR")
     [[ -t 0 ]] || init_args+=(--promptDefaults)
     # A cancelled prompt (seen after arrow keys, whose escape sequence starts
     # with Esc) stops init without saving anything, yet it still exits 0;
@@ -168,7 +170,7 @@ if [[ "$PLAYBOOK" == site.yml || "$PLAYBOOK" == *workstation.yml ]] \
     else
       warn "chezmoi stopped before saving its answers, so nothing was applied.
    Esc or an arrow key at a prompt seems to cancel it; answer with text and Enter.
-   Re-run:  chezmoi init --apply --source \"$REPO_DIR\""
+   Re-run:  chezmoi init --apply --less-interactive --source \"$REPO_DIR\""
     fi
   fi
 fi

@@ -1,70 +1,41 @@
+{{- /*
+  Rendered to ~/.config/opencode/opencode.jsonc by chezmoi; API keys come from
+  `sync-secrets`. The volatile provider tuning (default model, OpenRouter
+  profiles and models) is machine-local in ~/.config/opencode/providers.jsonc,
+  seeded from home/.chezmoitemplates/opencode-providers.jsonc; re-seed with
+  OPENCODE_RESEED=1 chezmoi apply. This template falls back to the tracked
+  default for as long as the local file is missing.
+*/ -}}
 {{- $dir := includeTemplate "secrets-dir" . -}}
+{{- $local := joinPath .chezmoi.homeDir ".config/opencode/providers.jsonc" -}}
+{{- $providers := "" -}}
+{{- if stat $local -}}
+{{-   $providers = include $local | fromJsonc -}}
+{{- else -}}
+{{-   $providers = include ".chezmoitemplates/opencode-providers.jsonc" | fromJsonc -}}
+{{- end -}}
 {
   // Managed by chezmoi (home/private_dot_config/opencode/opencode.jsonc.tmpl).
-  // Keys come from `sync-secrets`.
+  // Keys come from `sync-secrets`; the provider tuning comes from
+  // ~/.config/opencode/providers.jsonc (tracked default as fallback).
   "$schema": "https://opencode.ai/config.json",
   "autoupdate": "notify",
-  "model": "work/z-ai/glm-5.3-flash",
-  "small_model": "work/z-ai/glm-5.3-flash",
+  "model": {{ $providers.model | quote }},
+  "small_model": {{ $providers.small_model | quote }},
   "provider": {
-    "work": {
-      "npm": "@openrouter/ai-sdk-provider",
+{{- range $name, $profile := $providers.profiles }}
+    {{ $name | quote }}: {
+      "npm": {{ $providers.npm | quote }},
       "options": {
-        "apiKey": "{file:{{ $dir }}/openrouter.work.key}"
+        "apiKey": "{file:{{ $dir }}/{{ $profile.keyFile }}}"
       },
       "models": {
-        "z-ai/glm-5.3-flash": {
-          "attachment": true,
-          "modalities": {
-            "input": ["text", "image"],
-            "output": ["text"]
-          },
-          "options": {
-            "provider": {
-              "order": ["relace", "digitalocean", "z-ai"],
-              "only": ["relace", "digitalocean", "z-ai"]
-            }
-          }
-        },
-        "deepseek/deepseek-v4-flash-0731": {
-          "options": {
-            "provider": {
-              "order": ["relace", "inceptron"],
-              "only": ["relace", "inceptron"]
-            }
-          }
-        }
+{{-   range $modelID, $model := $providers.models }}
+        {{ $modelID | quote }}: {{ $model | toJson }},
+{{-   end }}
       }
     },
-    "personal": {
-      "npm": "@openrouter/ai-sdk-provider",
-      "options": {
-        "apiKey": "{file:{{ $dir }}/openrouter.personal.key}"
-      },
-      "models": {
-        "z-ai/glm-5.3-flash": {
-          "attachment": true,
-          "modalities": {
-            "input": ["text", "image"],
-            "output": ["text"]
-          },
-          "options": {
-            "provider": {
-              "order": ["relace", "digitalocean", "z-ai"],
-              "only": ["relace", "digitalocean", "z-ai"]
-            }
-          }
-        },
-        "deepseek/deepseek-v4-flash-0731": {
-          "options": {
-            "provider": {
-              "order": ["relace", "inceptron"],
-              "only": ["relace", "inceptron"]
-            }
-          }
-        }
-      }
-    }
+{{- end }}
   },
   "mcp": {
     "GitHits": {

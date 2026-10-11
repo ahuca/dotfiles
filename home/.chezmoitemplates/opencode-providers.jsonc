@@ -1,0 +1,51 @@
+// OpenCode provider tuning: the tracked default. The run_once seed scripts
+// (home/run_once_before_opencode-providers.{sh,ps1}.tmpl) copy it to
+// ~/.config/opencode/providers.jsonc, and opencode.jsonc.tmpl falls back to
+// it for as long as that file is missing.
+//
+// Tune on a machine: edit ~/.config/opencode/providers.jsonc, `chezmoi
+// apply`. Git never sees it.
+// Re-seed from this default: `OPENCODE_RESEED=1 chezmoi apply`.
+// Promote a tuning you want to keep: copy your local file over this one and
+// commit it; fresh machines (and machines you re-seed) then follow it.
+//
+// Shape: `model` / `small_model` (default models), `npm` (the provider SDK
+// package), `profiles` (an OpenCode provider ID per sync-secrets key file)
+// and `models`, the model map every profile shares; entries pass through
+// verbatim, so anything opencode accepts goes here.
+{
+  "npm": "@openrouter/ai-sdk-provider",
+  "model": "work/z-ai/glm-5.3-flash",
+  "small_model": "work/z-ai/glm-5.3-flash",
+  "profiles": {
+    "work": {
+      "keyFile": "openrouter.work.key"
+    },
+    "personal": {
+      "keyFile": "openrouter.personal.key"
+    }
+  },
+  "models": {
+    "z-ai/glm-5.3-flash": {
+      "attachment": true,
+      "modalities": {
+        "input": ["text", "image"],
+        "output": ["text"]
+      },
+      "options": {
+        "provider": {
+          "order": ["relace", "digitalocean", "z-ai"],
+          "only": ["relace", "digitalocean", "z-ai"]
+        }
+      }
+    },
+    "deepseek/deepseek-v4-flash-0731": {
+      "options": {
+        "provider": {
+          "order": ["relace", "inceptron"],
+          "only": ["relace", "inceptron"]
+        }
+      }
+    }
+  }
+}

@@ -188,8 +188,8 @@ kernel maps the button itself.
 Everything under `$HOME` comes from `home/`, chezmoi's source state
 (`.chezmoiroot` points it there, so the rest of the repo is invisible to it).
 Ansible installs software; chezmoi writes the configuration. Both bootstraps
-run `chezmoi init --apply --source <checkout>`, which also records the
-checkout as chezmoi's source directory, so afterwards:
+run `chezmoi init --apply --less-interactive --source <checkout>`, which also
+records the checkout as chezmoi's source directory, so afterwards:
 
 ```bash
 chezmoi diff             # what apply would change
@@ -198,16 +198,19 @@ chezmoi edit ~/.zshrc    # edit the source file behind a target
 chezmoi init --prompt    # answer the per-machine questions again
 ```
 
-A target you edited by hand makes `chezmoi apply` stop and ask. Keep
-machine-only additions in the local files the managed ones read:
-`~/.gitconfig.local`, `~/.ssh/config.local`, `~/.zshrc.local`.
+A target you edited by hand makes `chezmoi apply` stop and ask, and the
+bootstraps' `--less-interactive` extends that to files that already exist but
+aren't chezmoi's yet. Keep machine-only additions in the local files the
+managed ones read: `~/.gitconfig.local`, `~/.ssh/config.local`,
+`~/.zshrc.local` — and opencode's provider tuning
+([below](#opencode-provider-tuning)), which a seed script writes for you.
 
 | Target | Linux | Windows |
 |--------|:-----:|:-------:|
 | `~/.gitconfig`, `~/.config/git/` — identity, SSH signing, per-remote profiles, delta | ✓ | ✓ |
 | `~/.ssh/config`, `~/.ssh/git-profiles/*.pub` — one Bitwarden key per profile host | ✓ | ✓ |
 | lazygit (delta as its pager) — `~/.config/lazygit/` / `%LOCALAPPDATA%\lazygit\` | ✓ | ✓ |
-| `~/.config/opencode/opencode.jsonc` — keys by `{file:}` reference | ✓ | ✓ |
+| `~/.config/opencode/opencode.jsonc` — keys by `{file:}` reference, provider tuning from a machine-local `providers.jsonc` (see [OpenCode provider tuning](#opencode-provider-tuning)) | ✓ | ✓ |
 | Neovim's LazyVim config — `~/.config/nvim/` / `%LOCALAPPDATA%\nvim\` (see [Neovim](#neovim-lazyvim)) | ✓ | ✓ |
 | `sync-secrets` — `~/.local/bin/sync-secrets` / `sync-secrets.ps1` | rbw | bw |
 | `~/.config/powershell/profile.ps1` — history suggestions, menu Tab, Oh My Posh | ✓ | ✓ |
@@ -219,6 +222,33 @@ platform doesn't use. Shared pieces live in `home/.chezmoitemplates/`, and
 repo data in `home/.chezmoidata/vault.yaml`: everything from the vault (the
 secrets list, rbw's settings, the SSH agent socket) under one `vault` key,
 merged with the per-machine `vault.url` / `vault.email`.
+
+### OpenCode provider tuning
+
+The provider half of `~/.config/opencode/opencode.jsonc` — the default model,
+the OpenRouter profiles, their per-model routing — changes too often to
+version, so it lives in a machine-local `~/.config/opencode/providers.jsonc`
+(JSONC; comments welcome). The managed config renders it in, falling back to
+the tracked default, `home/.chezmoitemplates/opencode-providers.jsonc`. A
+`run_once_before_` seed script (sh on Linux, ps1 on Windows) copies that
+default to the local file before the config files render — a machine's first
+apply seeds it, and a re-seed is rendered in the same apply. After that it
+leaves the file alone.
+
+- **Tune:** edit `~/.config/opencode/providers.jsonc`, then `chezmoi apply`.
+  Git never sees it.
+- **Re-seed** from the tracked default: `OPENCODE_RESEED=$(date +%s) chezmoi
+  apply` (PowerShell: `$env:OPENCODE_RESEED = (Get-Date).Ticks; chezmoi
+  apply`). The value must be fresh every time: chezmoi skips `run_once`
+  scripts whose rendered contents it has already run, and the variable is
+  baked into the rendered script exactly so a new value changes them.
+- **Promote** a tuning: copy your local file over
+  `home/.chezmoitemplates/opencode-providers.jsonc` and commit it. Fresh
+  machines seed from it; machines you explicitly re-seed follow it.
+
+The file holds `model` / `small_model`, `npm`, `profiles` (an OpenCode
+provider ID per `sync-secrets` key file) and `models`, the model map every
+profile shares.
 
 ### Neovim (LazyVim)
 
