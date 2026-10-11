@@ -79,19 +79,16 @@
   loop: [vmmon, vmnet]
 
 # Running `vmware-modconfig --install-all` after this undoes the signing.
+# Read /proc/modules directly: `lsmod | grep -q` under pipefail fails with
+# SIGPIPE (141) once grep exits on its match.
 - name: Confirm both modules are loaded
-  ansible.builtin.shell:
-    cmd: |
-      set -o pipefail
-      lsmod | grep -q '^vmmon ' && lsmod | grep -q '^vmnet '
-    executable: /bin/bash
+  ansible.builtin.command: grep -cE '^(vmmon|vmnet) ' /proc/modules
   register: _lsmod_check
   changed_when: false
   check_mode: false
   failed_when: false
-  become: true
 
 - name: Fail with a pointer at the kernel log
   ansible.builtin.fail:
     msg: "Modules not loaded. Check: sudo dmesg | grep -iE 'vmmon|vmnet|rejected' | tail"
-  when: _lsmod_check.rc != 0
+  when: _lsmod_check.stdout | trim != '2'
