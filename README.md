@@ -342,10 +342,12 @@ After the run:
 - Open a new Windows Terminal: PowerShell 7 is the default profile, with Oh My
   Posh's default theme in CaskaydiaCove Nerd Font. `oh-my-posh init pwsh
   --config <theme>` in `~\.config\powershell\profile.ps1` picks another.
-- If you answered yes to `< > |` on AltGr, restart PowerToys (tray icon →
-  Exit, then start it again): it reads the Keyboard Manager remaps chezmoi
-  wrote only at startup. They don't reach apps running as Administrator
-  unless PowerToys runs elevated too.
+- If you answered yes to `< > |` on AltGr, exit PowerToys (tray icon → Exit)
+  before `chezmoi apply` and start it afterwards: it reads the Keyboard
+  Manager remaps only at startup, and while running it saves its own
+  settings over chezmoi's (switching Keyboard Manager back off). The remaps
+  don't reach apps running as Administrator unless PowerToys runs elevated
+  too.
 
 Not tested on real Windows yet: the WinGet file, the scripts and the templates
 were only parsed, and rendered on Linux with the OS switched.

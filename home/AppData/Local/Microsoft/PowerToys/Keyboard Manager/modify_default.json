@@ -14,8 +14,12 @@
 {{- range $ours }}{{ $oursKeys = append $oursKeys .originalKeys }}{{ end -}}
 
 {{- $config := dict -}}
-{{- $in := .chezmoi.stdin | trimPrefix "﻿" -}}
+{{- $in := .chezmoi.stdin | trimPrefix "\ufeff" -}}
 {{- if trim $in }}{{ $config = fromJson $in }}{{ end -}}
+{{- /* Untouched copy: when nothing changes, the file is returned as is,
+       so PowerToys' own formatting doesn't show up as a diff. */ -}}
+{{- $original := dict -}}
+{{- if trim $in }}{{ $original = fromJson $in }}{{ end -}}
 
 {{- $global := list -}}
 {{- range dig "remapShortcutsToText" "global" (list) $config }}
@@ -30,4 +34,6 @@
 {{-     $config = setValueAtPath $path (list) $config }}
 {{-   end }}
 {{- end -}}
+{{- if deepEqual $original $config }}{{ .chezmoi.stdin }}{{ else -}}
 {{ toPrettyJson "    " $config }}
+{{ end -}}
