@@ -210,9 +210,10 @@ machine-only additions in the local files the managed ones read:
 | `~/.config/opencode/opencode.jsonc` — keys by `{file:}` reference | ✓ | ✓ |
 | Neovim's LazyVim config — `~/.config/nvim/` / `%LOCALAPPDATA%\nvim\` (see [Neovim](#neovim-lazyvim)) | ✓ | ✓ |
 | `sync-secrets` — `~/.local/bin/sync-secrets` / `sync-secrets.ps1` | rbw | bw |
-| `~/.config/powershell/profile.ps1` — history suggestions, menu Tab, Oh My Posh | ✓ | ✓ |
+| `~/.config/powershell/profile.ps1` — history suggestions, menu Tab, Oh My Posh, pnpm's global bin on PATH | ✓ | ✓ |
 | `~/.zshrc`, rbw's config, Ghostty's config | ✓ | |
 | Windows Terminal (PowerShell 7 default, CaskaydiaCove Nerd Font), the Nerd Font itself | | ✓ |
+| topgrade drop-in `%APPDATA%\topgrade.d\winget.toml` — no self-update, winget upgrades it | | ✓ |
 | PowerToys Keyboard Manager — opt-in `< > \|` on AltGr+`,` `.` `-` (Linux: the `desktop` role's `xkb_lsgt_on_altgr`) | | ✓ |
 
 Templates branch on `.chezmoi.os`; `home/.chezmoiignore` drops what a

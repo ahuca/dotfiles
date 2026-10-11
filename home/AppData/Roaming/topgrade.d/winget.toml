@@ -1,0 +1,9 @@
+# Managed by chezmoi (home/AppData/Roaming/topgrade.d/winget.toml). A drop-in,
+# so topgrade's own %APPDATA%\topgrade.toml stays yours.
+#
+# winget installed topgrade and upgrades it in its own step. A self-update
+# swaps the portable exe behind winget's back, after which winget refuses it
+# ("Unable to remove Portable package as it has been modified", 0x8a15002c)
+# and fails the whole winget step.
+[misc]
+no_self_update = true

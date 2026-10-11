@@ -9,6 +9,14 @@ if ((Test-Path $localBin) -and ($env:PATH -split [IO.Path]::PathSeparator) -notc
     $env:PATH = $localBin + [IO.Path]::PathSeparator + $env:PATH
 }
 
+# What `pnpm setup` would add, as in zsh; pnpm refuses global commands
+# (`pnpm update -g`, topgrade's pnpm step) while its global bin isn't on PATH.
+$env:PNPM_HOME = if ($IsWindows) { Join-Path $env:LOCALAPPDATA 'pnpm' } else { Join-Path $HOME '.local/share/pnpm' }
+$pnpmBin = Join-Path $env:PNPM_HOME 'bin'
+if (($env:PATH -split [IO.Path]::PathSeparator) -notcontains $pnpmBin) {
+    $env:PATH = $pnpmBin + [IO.Path]::PathSeparator + $env:PATH
+}
+
 if ($Host.Name -eq 'ConsoleHost') {
     # Grey suggestions from history (→ accepts), like zsh-autosuggestions, and
     # a menu on Tab instead of cycling through completions one at a time.
