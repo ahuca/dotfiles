@@ -201,6 +201,9 @@ homebrew_packages:
   - opencode
   # Applies the dotfiles in home/ (bootstrap.sh runs it after the playbook).
   - chezmoi
+  # Ubuntu's rclone (1.60) is too old for the onedrive backend; topgrade
+  # keeps the brew formula current.
+  - rclone
 
 # ── TPM / LUKS auto-unlock (playbooks/tpm-unlock.yml) ───────────────
 tpm_pcrs: "7"          # e.g. "0,7"
