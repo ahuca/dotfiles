@@ -44,11 +44,13 @@
   loop_control:
     label: "{{ item.item }}"
 
+# grep -c, not -q: -q exits on the first match, and the lister's next write
+# then dies of SIGPIPE, which pipefail turns into a failure.
 - name: Look for clevis inside the running kernel's initrd
   ansible.builtin.shell:
     cmd: |
       set -o pipefail
-      {{ (initrd_sys == 'dracut') | ternary('lsinitrd', 'lsinitramfs') }} /boot/initrd.img-{{ ansible_facts.kernel }} 2>/dev/null | grep -q clevis
+      {{ (initrd_sys == 'dracut') | ternary('lsinitrd', 'lsinitramfs') }} /boot/initrd.img-{{ ansible_facts.kernel }} 2>/dev/null | grep -c clevis
     executable: /bin/bash
   register: _initrd_check
   changed_when: false
