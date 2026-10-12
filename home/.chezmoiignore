@@ -1,4 +1,7 @@
-{{- /* Targets chezmoi leaves alone on this machine. */ -}}
+{{- /* Targets chezmoi leaves alone, everywhere. */ -}}
+# Machine-local and bootstrapped once by a run_once script; chezmoi never
+# tracks or renders it.
+.config/opencode
 {{- if ne .chezmoi.os "windows" }}
 AppData
 .local/bin/sync-secrets.ps1
@@ -17,7 +20,6 @@ AppData
 {{- if not (and .vault.url .vault.email) }}
 # No vault: no secrets plumbing.
 .config/rbw
-.config/opencode
 .local/bin/sync-secrets
 .local/bin/sync-secrets.ps1
 {{- end }}
