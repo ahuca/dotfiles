@@ -202,15 +202,15 @@ A target you edited by hand makes `chezmoi apply` stop and ask, and the
 bootstraps' `--less-interactive` extends that to files that already exist but
 aren't chezmoi's yet. Keep machine-only additions in the local files the
 managed ones read: `~/.gitconfig.local`, `~/.ssh/config.local`,
-`~/.zshrc.local`. OpenCode's whole config is machine-local too — a seed
-script bootstraps it once, and from then on you edit it directly
-([below](#opencode)).
+`~/.zshrc.local`. OpenCode's config is machine-local too — chezmoi creates
+it once, and from then on you edit it directly ([below](#opencode)).
 
 | Target | Linux | Windows |
 |--------|:-----:|:-------:|
 | `~/.gitconfig`, `~/.config/git/` — identity, SSH signing, per-remote profiles, delta | ✓ | ✓ |
 | `~/.ssh/config`, `~/.ssh/git-profiles/*.pub` — one Bitwarden key per profile host | ✓ | ✓ |
 | lazygit (delta as its pager) — `~/.config/lazygit/` / `%LOCALAPPDATA%\lazygit\` | ✓ | ✓ |
+| opencode config — `~/.config/opencode/opencode.jsonc`, created once, then yours to edit (see [OpenCode](#opencode)) | ✓ | ✓ |
 | Neovim's LazyVim config — `~/.config/nvim/` / `%LOCALAPPDATA%\nvim\` (see [Neovim](#neovim-lazyvim)) | ✓ | ✓ |
 | `sync-secrets` — `~/.local/bin/sync-secrets` / `sync-secrets.ps1` | rbw | bw |
 | `~/.config/powershell/profile.ps1` — history suggestions, menu Tab, Oh My Posh | ✓ | ✓ |
@@ -225,38 +225,33 @@ merged with the per-machine `vault.url` / `vault.email`.
 
 ### OpenCode
 
-`~/.config/opencode/` is machine-local: `home/.chezmoiignore` excludes it, so
-chezmoi never diffs or overwrites it and git never sees it. A
-`run_once_before_` script (sh on Linux, ps1 on Windows) bootstraps the
-directory once, on a machine's first apply:
+`~/.config/opencode/opencode.jsonc` is machine-local: a `create_` template
+(`home/private_dot_config/private_dot_opencode/create_opencode.jsonc.tmpl`)
+creates it on a machine's first apply and never touches it again — the
+directory's other contents stay ignored (`home/.chezmoiignore`), so chezmoi
+never diffs the file and git never sees it. The template renders the full
+config — schema, autoupdate, mcp, `{file:}` key references into
+`sync-secrets`' directory — with the default tuning from
+`home/.chezmoitemplates/opencode-providers.jsonc`, which holds `model` /
+`small_model`, `npm`, `profiles` (an OpenCode provider ID per `sync-secrets`
+key file) and `models`, the model map every profile shares.
 
-- `providers.jsonc` — a copy of the tracked default,
-  `home/.chezmoitemplates/opencode-providers.jsonc` (which holds `model` /
-  `small_model`, `npm`, `profiles` — an OpenCode provider ID per
-  `sync-secrets` key file — and `models`, the model map every profile
-  shares). The seed, the reset source, and the file you promote.
-- `opencode.jsonc` — the full config: schema, autoupdate, mcp, `{file:}` key
-  references into `sync-secrets`' directory, with the default tuning rendered
-  in at bootstrap.
+From then on the file is yours: edit it directly — opencode hot-reloads it —
+and nothing rewrites it behind your back.
 
-From then on the files are yours: edit `opencode.jsonc` directly — opencode
-hot-reloads it — and nothing rewrites it behind your back.
+- **Reset** to the tracked default (wipes local edits): delete the file and
+  force the re-creation — `rm ~/.config/opencode/opencode.jsonc && chezmoi
+  apply --force` (PowerShell: `Remove-Item
+  ~\.config\opencode\opencode.jsonc; chezmoi apply --force`). The `--force`
+  answers chezmoi's "changed since I last wrote it" check, which a deleted
+  managed file otherwise raises.
+- **Change the default**: edit
+  `home/.chezmoitemplates/opencode-providers.jsonc`, commit, push. Fresh
+  machines bootstrap from it; existing machines get it with the delete +
+  apply above.
 
-- **Re-apply** both files from the tracked default (wipes local edits):
-  `OPENCODE_RESEED=$(date +%s) chezmoi apply` (PowerShell:
-  `$env:OPENCODE_RESEED = (Get-Date).Ticks; chezmoi apply`). The value must
-  be fresh every time: chezmoi skips `run_once` scripts whose rendered
-  contents it has already run, and the variable is baked into the rendered
-  script exactly so a new value changes them.
-- **Promote** a tuning: copy your `providers.jsonc` over
-  `home/.chezmoitemplates/opencode-providers.jsonc` and commit it. Fresh
-  machines bootstrap from it; re-applies follow it.
-- Machines that already have the files (including from the earlier design)
-  keep them: the script no-ops unless forced. Until a re-apply, such a
-  machine's config keeps its old header comment.
-
-The bootstrap needs the vault: without `vault.url` / `vault.email` the script
-renders empty and nothing is written, since the config refers to keys
+The creation needs the vault: without `vault.url` / `vault.email` the whole
+directory is ignored and nothing is written, since the config refers to keys
 `sync-secrets` fetches.
 
 ### Neovim (LazyVim)

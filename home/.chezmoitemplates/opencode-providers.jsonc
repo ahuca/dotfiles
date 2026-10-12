@@ -1,13 +1,11 @@
-// OpenCode provider tuning: the tracked default. The run_once seed scripts
-// (home/run_once_before_opencode-providers.{sh,ps1}.tmpl) copy it to
-// ~/.config/opencode/providers.jsonc, and opencode.jsonc.tmpl falls back to
-// it for as long as that file is missing.
+// OpenCode provider tuning: the tracked default. The create_ template
+// (home/private_dot_config/private_dot_opencode/create_opencode.jsonc.tmpl)
+// renders it into ~/.config/opencode/opencode.jsonc when that file is
+// created.
 //
-// Tune on a machine: edit ~/.config/opencode/providers.jsonc, `chezmoi
-// apply`. Git never sees it.
-// Re-seed from this default: `OPENCODE_RESEED=1 chezmoi apply`.
-// Promote a tuning you want to keep: copy your local file over this one and
-// commit it; fresh machines (and machines you re-seed) then follow it.
+// Change the default: edit this file, commit, push. Fresh machines get it
+// at bootstrap; existing machines after deleting their opencode.jsonc and
+// applying again.
 //
 // Shape: `model` / `small_model` (default models), `npm` (the provider SDK
 // package), `profiles` (an OpenCode provider ID per sync-secrets key file)

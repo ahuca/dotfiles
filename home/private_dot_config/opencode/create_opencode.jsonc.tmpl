@@ -1,0 +1,52 @@
+{{- /*
+  opencode's machine-local config. The create_ prefix means chezmoi creates
+  it only if it does not exist - afterwards the file is yours to edit and
+  chezmoi never modifies it (opencode hot-reloads edits; git never sees it;
+  the sibling files in the directory stay ignored via .chezmoiignore).
+  Reset: delete the file, `chezmoi apply` re-creates it from the tracked
+  default tuning in home/.chezmoitemplates/opencode-providers.jsonc,
+  wiping local edits. Skipped without a vault (.chezmoiignore), since the
+  config refers to keys `sync-secrets` fetches.
+*/ -}}
+{{- $dir := includeTemplate "secrets-dir" . -}}
+{{- $providers := include ".chezmoitemplates/opencode-providers.jsonc" | fromJsonc -}}
+{
+  // Created by chezmoi on first apply; yours to edit - opencode hot-reloads
+  // changes. Reset to the tracked default by deleting this file and running
+  // `chezmoi apply` again.
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": "notify",
+  "model": {{ $providers.model | quote }},
+  "small_model": {{ $providers.small_model | quote }},
+  "provider": {
+{{- range $name, $profile := $providers.profiles }}
+    {{ $name | quote }}: {
+      "npm": {{ $providers.npm | quote }},
+      "options": {
+        "apiKey": "{file:{{ $dir }}/{{ $profile.keyFile }}}"
+      },
+      "models": {
+{{-   range $modelID, $model := $providers.models }}
+        {{ $modelID | quote }}: {{ $model | toJson }},
+{{-   end }}
+      }
+    },
+{{- end }}
+  },
+  "mcp": {
+    "GitHits": {
+      "type": "remote",
+      "url": "https://mcp.githits.com"
+    },
+    "atlassian": {
+      "type": "local",
+      "command": ["uvx", "mcp-atlassian"],
+      "enabled": true,
+      "environment": {
+        "JIRA_URL": "{file:{{ $dir }}/jira.work.url}",
+        "JIRA_USERNAME": "{file:{{ $dir }}/jira.work.user}",
+        "JIRA_API_TOKEN": "{file:{{ $dir }}/jira.work.key}"
+      }
+    }
+  }
+}

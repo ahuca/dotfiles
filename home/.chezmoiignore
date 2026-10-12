@@ -1,7 +1,14 @@
 {{- /* Targets chezmoi leaves alone, everywhere. */ -}}
-# Machine-local and bootstrapped once by a run_once script; chezmoi never
-# tracks or renders it.
+{{- if and .vault.url .vault.email }}
+# opencode's config: created once by the create_ target, then the user's to
+# edit. Ignore the directory's other contents; the config file is managed
+# create-only.
+.config/opencode/*
+!.config/opencode/opencode.jsonc
+{{- else }}
+# No vault: no secrets plumbing, no opencode config.
 .config/opencode
+{{- end }}
 {{- if ne .chezmoi.os "windows" }}
 AppData
 .local/bin/sync-secrets.ps1
