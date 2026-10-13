@@ -1,20 +1,21 @@
 // OpenCode provider tuning: the tracked default. The create_ template
-// (home/private_dot_config/private_dot_opencode/create_opencode.jsonc.tmpl)
-// renders it into ~/.config/opencode/opencode.jsonc when that file is
-// created.
+// (home/private_dot_config/opencode/create_opencode.jsonc.tmpl) renders it
+// into ~/.config/opencode/opencode.jsonc when that file is created.
 //
 // Change the default: edit this file, commit, push. Fresh machines get it
 // at bootstrap; existing machines after deleting their opencode.jsonc and
 // applying again.
 //
-// Shape: `model` / `small_model` (default models), `npm` (the provider SDK
-// package), `profiles` (an OpenCode provider ID per sync-secrets key file)
-// and `models`, the model map every profile shares; entries pass through
-// verbatim, so anything opencode accepts goes here.
+// Shape: `model` / `title_model` (default models), `package` (the provider
+// runtime package), `profiles` (an OpenCode provider ID per sync-secrets key
+// file) and `models`, the model map every profile shares; entries pass
+// through verbatim, so anything opencode accepts goes here.
+//
+// Native OpenCode V2 shape (https://opencode.ai/v2/docs/migrate-v1).
 {
-  "npm": "@openrouter/ai-sdk-provider",
+  "package": "aisdk:@openrouter/ai-sdk-provider",
   "model": "work/z-ai/glm-5.3-flash",
-  "small_model": "work/z-ai/glm-5.3-flash",
+  "title_model": "work/z-ai/glm-5.3-flash",
   "profiles": {
     "work": {
       "keyFile": "openrouter.work.key"
@@ -25,12 +26,11 @@
   },
   "models": {
     "z-ai/glm-5.3-flash": {
-      "attachment": true,
-      "modalities": {
+      "capabilities": {
         "input": ["text", "image"],
         "output": ["text"]
       },
-      "options": {
+      "settings": {
         "provider": {
           "order": ["relace", "digitalocean", "z-ai"],
           "only": ["relace", "digitalocean", "z-ai"]
@@ -38,7 +38,7 @@
       }
     },
     "deepseek/deepseek-v4-flash-0731": {
-      "options": {
+      "settings": {
         "provider": {
           "order": ["relace", "inceptron"],
           "only": ["relace", "inceptron"]
