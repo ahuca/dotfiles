@@ -1,4 +1,14 @@
-{{- /* Targets chezmoi leaves alone on this machine. */ -}}
+{{- /* Targets chezmoi leaves alone, everywhere. */ -}}
+{{- if and .vault.url .vault.email }}
+# opencode's config: created once by the create_ target, then the user's to
+# edit. Ignore the directory's other contents; the config file is managed
+# create-only.
+.config/opencode/*
+!.config/opencode/opencode.jsonc
+{{- else }}
+# No vault: no secrets plumbing, no opencode config.
+.config/opencode
+{{- end }}
 {{- if ne .chezmoi.os "windows" }}
 AppData
 .local/bin/sync-secrets.ps1
@@ -21,7 +31,6 @@ AppData/Local/Microsoft/PowerToys
 {{- if not (and .vault.url .vault.email) }}
 # No vault: no secrets plumbing.
 .config/rbw
-.config/opencode
 .local/bin/sync-secrets
 .local/bin/sync-secrets.ps1
 {{- end }}

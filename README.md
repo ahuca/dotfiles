@@ -188,8 +188,8 @@ kernel maps the button itself.
 Everything under `$HOME` comes from `home/`, chezmoi's source state
 (`.chezmoiroot` points it there, so the rest of the repo is invisible to it).
 Ansible installs software; chezmoi writes the configuration. Both bootstraps
-run `chezmoi init --apply --source <checkout>`, which also records the
-checkout as chezmoi's source directory, so afterwards:
+run `chezmoi init --apply --less-interactive --source <checkout>`, which also
+records the checkout as chezmoi's source directory, so afterwards:
 
 ```bash
 chezmoi diff             # what apply would change
@@ -198,16 +198,19 @@ chezmoi edit ~/.zshrc    # edit the source file behind a target
 chezmoi init --prompt    # answer the per-machine questions again
 ```
 
-A target you edited by hand makes `chezmoi apply` stop and ask. Keep
-machine-only additions in the local files the managed ones read:
-`~/.gitconfig.local`, `~/.ssh/config.local`, `~/.zshrc.local`.
+A target you edited by hand makes `chezmoi apply` stop and ask, and the
+bootstraps' `--less-interactive` extends that to files that already exist but
+aren't chezmoi's yet. Keep machine-only additions in the local files the
+managed ones read: `~/.gitconfig.local`, `~/.ssh/config.local`,
+`~/.zshrc.local`. OpenCode's config is machine-local too — chezmoi creates
+it once, and from then on you edit it directly ([below](#opencode)).
 
 | Target | Linux | Windows |
 |--------|:-----:|:-------:|
 | `~/.gitconfig`, `~/.config/git/` — identity, SSH signing, per-remote profiles, delta | ✓ | ✓ |
 | `~/.ssh/config`, `~/.ssh/git-profiles/*.pub` — one Bitwarden key per profile host | ✓ | ✓ |
 | lazygit (delta as its pager) — `~/.config/lazygit/` / `%LOCALAPPDATA%\lazygit\` | ✓ | ✓ |
-| `~/.config/opencode/opencode.jsonc` — keys by `{file:}` reference | ✓ | ✓ |
+| opencode config — `~/.config/opencode/opencode.jsonc`, created once, then yours to edit (see [OpenCode](#opencode)) | ✓ | ✓ |
 | Neovim's LazyVim config — `~/.config/nvim/` / `%LOCALAPPDATA%\nvim\` (see [Neovim](#neovim-lazyvim)) | ✓ | ✓ |
 | `sync-secrets` — `~/.local/bin/sync-secrets` / `sync-secrets.ps1` | rbw | bw |
 | `~/.config/powershell/profile.ps1` — history suggestions, menu Tab, Oh My Posh, pnpm's global bin on PATH | ✓ | ✓ |
@@ -221,6 +224,37 @@ platform doesn't use. Shared pieces live in `home/.chezmoitemplates/`, and
 repo data in `home/.chezmoidata/vault.yaml`: everything from the vault (the
 secrets list, rbw's settings, the SSH agent socket) under one `vault` key,
 merged with the per-machine `vault.url` / `vault.email`.
+
+### OpenCode
+
+`~/.config/opencode/opencode.jsonc` is machine-local: a `create_` template
+(`home/private_dot_config/private_dot_opencode/create_opencode.jsonc.tmpl`)
+creates it on a machine's first apply and never touches it again — the
+directory's other contents stay ignored (`home/.chezmoiignore`), so chezmoi
+never diffs the file and git never sees it. The template renders the full
+config — schema, autoupdate, mcp, `{file:}` key references into
+`sync-secrets`' directory — with the default tuning from
+`home/.chezmoitemplates/opencode-providers.jsonc`, which holds `model` /
+`small_model`, `npm`, `profiles` (an OpenCode provider ID per `sync-secrets`
+key file) and `models`, the model map every profile shares.
+
+From then on the file is yours: edit it directly — opencode hot-reloads it —
+and nothing rewrites it behind your back.
+
+- **Reset** to the tracked default (wipes local edits): delete the file and
+  force the re-creation — `rm ~/.config/opencode/opencode.jsonc && chezmoi
+  apply --force` (PowerShell: `Remove-Item
+  ~\.config\opencode\opencode.jsonc; chezmoi apply --force`). The `--force`
+  answers chezmoi's "changed since I last wrote it" check, which a deleted
+  managed file otherwise raises.
+- **Change the default**: edit
+  `home/.chezmoitemplates/opencode-providers.jsonc`, commit, push. Fresh
+  machines bootstrap from it; existing machines get it with the delete +
+  apply above.
+
+The creation needs the vault: without `vault.url` / `vault.email` the whole
+directory is ignored and nothing is written, since the config refers to keys
+`sync-secrets` fetches.
 
 ### Neovim (LazyVim)
 

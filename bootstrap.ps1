@@ -87,11 +87,13 @@ if (-not (Get-Command chezmoi -ErrorAction SilentlyContinue)) {
     throw 'chezmoi is not installed (windows\configuration.winget).'
 }
 Write-Step 'Applying the dotfiles in home\ with chezmoi'
-chezmoi init --apply --source $here
+# --less-interactive: also ask before taking over files that already exist
+# but aren't chezmoi's yet (a re-run on a configured machine).
+chezmoi init --apply --less-interactive --source $here
 # A cancelled prompt (Esc, or an arrow key) stops init without saving
 # anything, yet it still exits 0; the missing config file gives it away.
 if ($LASTEXITCODE -or -not (Test-Path (Join-Path $HOME '.config\chezmoi\chezmoi.toml'))) {
-    throw "chezmoi stopped before saving its answers, so nothing was applied. Esc or an arrow key at a prompt seems to cancel it. Re-run:  chezmoi init --apply --source $here"
+    throw "chezmoi stopped before saving its answers, so nothing was applied. Esc or an arrow key at a prompt seems to cancel it. Re-run:  chezmoi init --apply --less-interactive --source $here"
 }
 
 # --- secrets --------------------------------------------------------------
