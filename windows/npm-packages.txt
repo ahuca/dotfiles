@@ -1,0 +1,5 @@
+# Global npm tools, installed by bootstrap.ps1 in one transaction.
+# One package spec per line; '#' starts a comment, blank lines are ignored.
+# Add a tool here, re-run bootstrap.ps1 (or just the npm step) to get it.
+opencode-ai@latest
+githits

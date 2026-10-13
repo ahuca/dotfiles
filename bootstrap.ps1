@@ -1,8 +1,9 @@
 # Provision this Windows machine: packages and machine-wide settings from
-# windows\configuration.winget, then the dotfiles in home\ with chezmoi.
+# windows\configuration.winget, global npm tools from windows\npm-packages.txt,
+# then the dotfiles in home\ with chezmoi.
 #
 #   .\bootstrap.ps1                       from a checkout
-#   .\bootstrap.ps1 -SkipConfigure        only the dotfiles and secrets
+#   .\bootstrap.ps1 -SkipConfigure        skip winget (npm tools, dotfiles, secrets still run)
 #
 # Fresh machine, nothing cloned yet (the built-in Windows PowerShell is fine):
 #   irm https://raw.githubusercontent.com/ahuca/dotfiles/main/bootstrap.ps1 | iex
@@ -75,6 +76,23 @@ if (-not $SkipConfigure) {
             Write-Warning "winget configure reported a problem (exit $LASTEXITCODE); carrying on with what it installed. Re-run:  winget configure -f windows\configuration.winget"
         }
     }
+    Update-SessionPath
+}
+
+# --- npm global tools ------------------------------------------------------
+# Listed in windows\npm-packages.txt so adding a tool is one line there.
+# One transaction: if any spec fails, none are installed. Re-runs upgrade.
+if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+    throw 'npm is missing: windows\configuration.winget installs Node.js LTS; run bootstrap without -SkipConfigure (or winget configure -f windows\configuration.winget), open a new shell, then re-run.'
+}
+$npmPackagesFile = Join-Path $here 'windows\npm-packages.txt'
+$npmPackages = Get-Content $npmPackagesFile |
+    ForEach-Object { ($_ -split '#', 2)[0].Trim() } |
+    Where-Object { $_ }
+if ($npmPackages) {
+    Write-Step ('Installing npm tools from windows\npm-packages.txt: ' + ($npmPackages -join ', '))
+    npm install --global @npmPackages
+    if ($LASTEXITCODE) { throw 'npm install --global failed; see above.' }
     Update-SessionPath
 }
 

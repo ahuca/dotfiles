@@ -107,10 +107,8 @@ properties:
       id: claudecode
       directives: { description: Claude Code, allowPrerelease: true }
       settings: { id: Anthropic.ClaudeCode, source: winget }
-    - resource: Microsoft.WinGet.DSC/WinGetPackage
-      id: opencode
-      directives: { description: opencode, allowPrerelease: true }
-      settings: { id: SST.opencode, source: winget }
+    # opencode is no longer installed by winget: bootstrap.ps1 installs it
+    # from npm (windows\npm-packages.txt), which tracks upstream faster.
     - resource: Microsoft.WinGet.DSC/WinGetPackage
       id: uv
       directives: { description: uv (opencode's Atlassian MCP runs under uvx), allowPrerelease: true }
