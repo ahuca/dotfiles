@@ -233,6 +233,15 @@
         label: "{{ item.key }}"
       when: item.value | sort != item.current | sort
 
+    - name: Configure the extensions
+      community.general.dconf:
+        key: "/org/gnome/shell/extensions/{{ item.key }}"
+        value: "{{ item.value }}"
+        state: present
+      loop: "{{ gnome_extension_settings | default({}) | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
 - name: Note the skipped GNOME Shell extensions
   ansible.builtin.debug:
     msg: No D-Bus session bus — re-run from your desktop session with --tags extensions

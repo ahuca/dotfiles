@@ -166,6 +166,12 @@ gnome_extensions:
 # Tiling Assistant snapping).
 gnome_extensions_disabled:
   - tiling-assistant@ubuntu.com
+# Their settings: key under /org/gnome/shell/extensions/ -> GVariant value.
+# Tiling Shell keeps a layout per workspace and monitor, and with dynamic
+# workspaces only the first workspace's survives a login; syncing a layout to
+# every workspace makes the pick stick per monitor (Tiling Shell 18+).
+gnome_extension_settings:
+  tilingshell/sync-layout-across-workspaces: "true"
 
 # ── touchpad ────────────────────────────────────────────────────────
 # Forward the middle button of touchpads whose kernel driver drops it.
