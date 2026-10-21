@@ -47,6 +47,13 @@
 [tag]
 	gpgsign = true
 {{- end }}
+{{- if lookPath "nvim" }}
+
+# nvim for commit messages and rebase todos; left out while it isn't
+# installed, so git falls back to $EDITOR or vi.
+[core]
+	editor = nvim
+{{- end }}
 {{- if lookPath "delta" }}
 
 # delta as the pager; left out while it isn't installed, since git errors on a
