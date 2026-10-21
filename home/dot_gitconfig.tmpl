@@ -66,6 +66,16 @@
 	# n / N jump between files.
 	navigate = true
 {{- end }}
+{{- if lookPath "git-lfs" }}
+
+# What `git lfs install` would write here; kept in the template so apply
+# doesn't drop it.
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+{{- end }}
 [merge]
 	# Conflict markers also show the common ancestor.
 	conflictStyle = zdiff3

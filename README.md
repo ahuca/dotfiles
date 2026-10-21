@@ -110,7 +110,7 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 |------------|------------------------------------------------------------------------------|
 | `common`   | apt keyring dir, base tooling (curl, wget, git, gpg, …)                       |
 | `apt_repos`| signing keys + deb822 `.sources` for Charm, VS Code, GitHub CLI, Claude Code, Edge, Microsoft prod (Intune), ONLYOFFICE |
-| `packages` | apt packages (incl. KDE Connect + its ufw ports + XWayland start for clipboard sync, lazygit, delta, tldr via tealdeer + its pages, rbw + pinentry for `sync-secrets`, ONLYOFFICE Desktop Editors), snaps (Bitwarden, PowerShell), D2, topgrade, UniFi Identity Desktop |
+| `packages` | apt packages (incl. KDE Connect + its ufw ports + XWayland start for clipboard sync, lazygit, delta, Git LFS, tldr via tealdeer + its pages, rbw + pinentry for `sync-secrets`, ONLYOFFICE Desktop Editors), snaps (Bitwarden, PowerShell), D2, topgrade, UniFi Identity Desktop |
 | `docker`   | Docker's apt repo + Docker Engine, Buildx, Compose; you in the `docker` group |
 | `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); Ctrl+Alt+Space to switch the keyboard layout (`wm_switch_input_source_bindings`); opt-in `< > \|` on AltGr+`,` `.` `-` (`xkb_lsgt_on_altgr`); GNOME Shell extensions from extensions.gnome.org (`gnome_extensions`: Tiling Shell, replacing Ubuntu's Tiling Assistant; loads at next login) and their settings (`gnome_extension_settings`: Tiling Shell layouts synced across workspaces, so they persist per monitor) |
 | `touchpad` | ASUS ProArt Studiobook touchpad: a root service that forwards the physical middle button the kernel drops (only where that touchpad is present; see below) |
@@ -207,7 +207,7 @@ it once, and from then on you edit it directly ([below](#opencode)).
 
 | Target | Linux | Windows |
 |--------|:-----:|:-------:|
-| `~/.gitconfig`, `~/.config/git/` — identity, SSH signing, per-remote profiles, delta | ✓ | ✓ |
+| `~/.gitconfig`, `~/.config/git/` — identity, SSH signing, per-remote profiles, delta, nvim as editor, Git LFS filter | ✓ | ✓ |
 | `~/.ssh/config`, `~/.ssh/git-profiles/*.pub` — one Bitwarden key per profile host | ✓ | ✓ |
 | lazygit (delta as its pager) — `~/.config/lazygit/` / `%LOCALAPPDATA%\lazygit\` | ✓ | ✓ |
 | opencode config — `~/.config/opencode/opencode.jsonc`, created once, then yours to edit (see [OpenCode](#opencode)) | ✓ | ✓ |
@@ -358,7 +358,7 @@ elevation.
 
 - **Shell**: PowerShell 7, Windows Terminal, Oh My Posh.
 - **Dotfiles and secrets**: chezmoi, Bitwarden, Bitwarden CLI.
-- **Dev tools**: Git, GitHub CLI, delta, lazygit, ripgrep, fzf, fd, Neovim
+- **Dev tools**: Git, Git LFS, GitHub CLI, delta, lazygit, ripgrep, fzf, fd, Neovim
   (and WinLibs GCC, which builds its tree-sitter parsers), glow, tealdeer,
   7-Zip, topgrade, Node.js LTS, VS Code, Claude Code, opencode, uv
   (opencode's Atlassian MCP runs under `uvx`).

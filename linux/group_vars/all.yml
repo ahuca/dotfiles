@@ -103,6 +103,7 @@ apt_packages:
   - glow
   - lazygit
   - git-delta
+  - git-lfs # its filter config comes from chezmoi's ~/.gitconfig
   - tealdeer # the tldr command
   # sync-secrets (chezmoi) fetches API keys with these.
   - rbw

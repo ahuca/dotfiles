@@ -48,6 +48,10 @@ properties:
       directives: { description: Git for Windows (Claude Code's Bash tool uses its bash), allowPrerelease: true }
       settings: { id: Git.Git, source: winget }
     - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: git-lfs
+      directives: { description: Git LFS (on PATH so chezmoi's ~/.gitconfig turns its filter on), allowPrerelease: true }
+      settings: { id: GitHub.GitLFS, source: winget }
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
       id: gh
       directives: { description: GitHub CLI, allowPrerelease: true }
       settings: { id: GitHub.cli, source: winget }
