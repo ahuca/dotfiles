@@ -215,6 +215,7 @@ it once, and from then on you edit it directly ([below](#opencode)).
 | `sync-secrets` — `~/.local/bin/sync-secrets` / `sync-secrets.ps1` | rbw | bw |
 | `~/.config/powershell/profile.ps1` — history suggestions, menu Tab, Oh My Posh, pnpm's global bin on PATH | ✓ | ✓ |
 | `~/.zshrc`, rbw's config, Ghostty's config | ✓ | |
+| Zen Flatpak override — mounts `/run/cups` instead of the cups socket, so printers survive the daily cups restart | ✓ | |
 | Windows Terminal (PowerShell 7 default, CaskaydiaCove Nerd Font), the Nerd Font itself | | ✓ |
 | topgrade drop-in `%APPDATA%\topgrade.d\winget.toml` — no self-update, winget upgrades it | | ✓ |
 | PowerToys Keyboard Manager — opt-in `< > \|` on AltGr+`,` `.` `-` (Linux: the `desktop` role's `xkb_lsgt_on_altgr`) | | ✓ |

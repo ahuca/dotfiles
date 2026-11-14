@@ -1,0 +1,7 @@
+# Print from Zen across CUPS restarts. Flatpak's cups socket bind-mounts
+# /run/cups/cups.sock itself, and the daily logrotate restart of cups
+# recreates that file, which leaves a running Zen with a dead socket and an
+# empty printer list. Mount the directory instead so the new socket shows up.
+[Context]
+sockets=!cups;
+filesystems=/run/cups:ro;
