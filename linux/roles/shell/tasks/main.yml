@@ -24,18 +24,30 @@
   when: oh_my_zsh_enabled | bool
   tags: [zsh, zsh_plugins]
 
+# Only a zsh from the OS: a login shell from Homebrew would lock you out of
+# the desktop if brew ever broke. On Bazzite that is the layered one, absent
+# if rpm-ostree failed or the image was rolled back past it.
 - name: Locate the zsh binary
-  ansible.builtin.command: which zsh
-  register: _zsh_path
-  changed_when: false
-  check_mode: false
+  ansible.builtin.stat:
+    path: /usr/bin/zsh
+  register: _zsh_bin
   when: zsh_set_default_shell | bool
   tags: [zsh]
 
 - name: Make zsh the login shell
   ansible.builtin.user:
     name: "{{ target_user }}"
-    shell: "{{ _zsh_path.stdout }}"
+    shell: /usr/bin/zsh
   become: true
-  when: zsh_set_default_shell | bool
+  when:
+    - zsh_set_default_shell | bool
+    - _zsh_bin.stat.exists
+  tags: [zsh]
+
+- name: Note the unchanged login shell
+  ansible.builtin.debug:
+    msg: "/usr/bin/zsh is missing, so the login shell stays as it is. Install zsh and re-run with --tags zsh."
+  when:
+    - zsh_set_default_shell | bool
+    - not _zsh_bin.stat.exists
   tags: [zsh]

@@ -1,0 +1,75 @@
+---
+# Bazzite (Fedora Atomic): /usr is the read-only image. Apps come as
+# Flatpaks, CLI tools from Homebrew (the homebrew role), and only what has to
+# sit on the host itself is layered into the image with rpm-ostree.
+
+- name: Install Flatpaks
+  community.general.flatpak:
+    name: "{{ flatpak_packages }}"
+    remote: flathub
+    method: system
+    state: present
+  become: true
+  when: flatpak_packages | length > 0
+  tags: [flatpak]
+
+# Layered packages survive image updates; --apply-live also puts them on the
+# running system, so no reboot is needed before the shell role uses zsh.
+- name: Layer host packages with rpm-ostree
+  when: rpm_ostree_packages | length > 0
+  tags: [rpm_ostree]
+  become: true
+  block:
+    - name: Look up the Fedora release
+      ansible.builtin.command: rpm -E %fedora # noqa: command-instead-of-module
+      register: _fedora_release
+      changed_when: false
+      check_mode: false
+      when: rpm_ostree_packages | selectattr('copr', 'defined') | list | length > 0
+
+    # What `dnf copr enable` would write; on an Atomic system rpm-ostree reads it.
+    - name: Add the COPR repositories
+      ansible.builtin.get_url:
+        url: "https://copr.fedorainfracloud.org/coprs/{{ item.copr }}/repo/{{ _fedora }}/{{ item.copr | replace('/', '-') }}-{{ _fedora }}.repo"
+        dest: "/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:{{ item.copr | replace('/', ':') }}.repo"
+        mode: "0644"
+      vars:
+        _fedora: "fedora-{{ _fedora_release.stdout }}"
+      loop: "{{ rpm_ostree_packages | selectattr('copr', 'defined') }}"
+      loop_control:
+        label: "{{ item.copr }}"
+
+    # One transaction each, so a package that fails doesn't hold up the rest.
+    - name: Layer the packages
+      community.general.rpm_ostree_pkg:
+        name: "{{ item.name }}"
+        apply_live: true
+      loop: "{{ rpm_ostree_packages }}"
+      loop_control:
+        label: "{{ item.name }}"
+  rescue:
+    - name: Explain the rpm-ostree failure without failing the run
+      ansible.builtin.debug:
+        msg: >-
+          Some of {{ rpm_ostree_packages | map(attribute='name') | join(', ') }}
+          could not be layered (see above). `rpm-ostree status` shows what is
+          layered; `sudo rpm-ostree install --apply-live <name>` retries one.
+          Packages the image already ships need no layering.
+
+# The native installer: ~/.local/bin/claude, which then updates itself.
+- name: Install Claude Code
+  when: claude_code_enabled | bool
+  tags: [claude]
+  block:
+    - name: Fetch the Claude Code install script
+      ansible.builtin.get_url:
+        url: https://claude.ai/install.sh
+        dest: /tmp/claude-install.sh
+        mode: "0755"
+      changed_when: false
+      check_mode: false
+
+    - name: Run the Claude Code installer
+      ansible.builtin.command:
+        cmd: "bash /tmp/claude-install.sh {{ claude_code_channel }}"
+        creates: "{{ target_home }}/.local/bin/claude"

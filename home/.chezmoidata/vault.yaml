@@ -4,9 +4,12 @@
 vault:
   # The Bitwarden desktop app's SSH agent holds every SSH key; nothing private
   # is written to disk. It appears once "Enable SSH agent" is ticked in the
-  # app's settings. This is the Linux (snap) socket. On Windows the agent takes
+  # app's settings. Its socket on Linux depends on how the app is installed
+  # (.chezmoitemplates/ssh-agent-socket picks one). On Windows the agent takes
   # over OpenSSH's default named pipe, so nothing needs pointing at it.
-  sshAgentSocket: ~/snap/bitwarden/current/.bitwarden-ssh-agent.sock
+  sshAgentSockets:
+    snap: ~/snap/bitwarden/current/.bitwarden-ssh-agent.sock                  # Ubuntu
+    flatpak: ~/.var/app/com.bitwarden.desktop/data/.bitwarden-ssh-agent.sock  # Bazzite
 
   # API keys that `sync-secrets` fetches (rbw on Linux, the Bitwarden CLI on
   # Windows) into an owner-only directory in the user profile. The disk is
@@ -25,6 +28,7 @@ vault:
 
   # rbw, the vault client sync-secrets uses on Linux.
   rbw:
-    pinentry: pinentry-gnome3      # pinentry-curses when headless
+    # The first one installed: GNOME (Ubuntu), KDE (Bazzite), then a terminal.
+    pinentry: [pinentry-gnome3, pinentry-qt, pinentry-curses]
     lockTimeout: 28800
     syncInterval: 3600             # 0 disables

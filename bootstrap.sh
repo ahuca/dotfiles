@@ -5,7 +5,9 @@
 #   ./bootstrap.sh                 # run site.yml
 #   ./bootstrap.sh --tags packages # args go straight to ansible-playbook
 #   ./bootstrap.sh -- playbooks/vmware.yml --tags status
-#   ANSIBLE_SOURCE=apt ./bootstrap.sh   # distro ansible-core instead of pipx
+#   ANSIBLE_SOURCE=apt ./bootstrap.sh   # distro ansible-core instead of pipx (Ubuntu)
+#
+# Runs on Ubuntu (apt) and Bazzite (Fedora Atomic, with Homebrew).
 #
 # Fresh machine, nothing cloned yet:
 #   wget -qO- https://raw.githubusercontent.com/ahuca/dotfiles/main/bootstrap.sh | bash
@@ -16,7 +18,18 @@ log()  { printf '\n\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\n\033[1;33m!!\033[0m %s\n' "$*" >&2; }
 die()  { printf '\n\033[1;31mxx\033[0m %s\n' "$*" >&2; exit 1; }
 
-command -v apt-get >/dev/null || die "This repo targets Debian/Ubuntu (apt) systems."
+# Mirrors linux/playbooks/platform.yml.
+os_id="$(. /etc/os-release 2>/dev/null && echo "${ID:-}")"
+if [[ "$os_id" == bazzite && -e /run/ostree-booted ]]; then
+  PLATFORM=bazzite
+elif command -v apt-get >/dev/null; then
+  PLATFORM=ubuntu
+else
+  die "This repo targets Ubuntu (apt) and Bazzite systems."
+fi
+BREW=/home/linuxbrew/.linuxbrew/bin/brew
+[[ "$PLATFORM" == bazzite && ! -x "$BREW" ]] \
+  && die "Bazzite's Homebrew is missing ($BREW); it is set up on first login."
 
 # --- piped from the web: clone, then re-run from the checkout ------------
 # The repo is public, so this needs no credentials. stdin is the pipe (this
@@ -24,7 +37,10 @@ command -v apt-get >/dev/null || die "This repo targets Debian/Ubuntu (apt) syst
 DOTFILES_REPO="${DOTFILES_REPO:-https://github.com/ahuca/dotfiles.git}"
 DOTFILES_DIR="${DOTFILES_DIR:-$HOME/Projects/dotfiles}"
 if [[ ! -f "${BASH_SOURCE[0]:-}" ]]; then
-  command -v git >/dev/null || { sudo apt-get update && sudo apt-get install -y git; }
+  if ! command -v git >/dev/null; then
+    [[ "$PLATFORM" == ubuntu ]] || die "git is missing."
+    sudo apt-get update && sudo apt-get install -y git
+  fi
   if [[ -d "$DOTFILES_DIR/.git" ]]; then
     log "Updating $DOTFILES_DIR"
     git -C "$DOTFILES_DIR" pull --ff-only
@@ -74,9 +90,18 @@ EXTRA_ARGS=("$@")
 # --- ansible -----------------------------------------------------------
 export PATH="$HOME/.local/bin:$PATH"
 
+# Bazzite has no apt: pipx from Homebrew, with Homebrew's Python.
+if [[ "$PLATFORM" == bazzite ]]; then
+  [[ "$ANSIBLE_SOURCE" == pipx ]] || die "On Bazzite, Ansible comes from pipx only (ANSIBLE_SOURCE=pipx)."
+  eval "$("$BREW" shellenv)"
+fi
+
 case "$ANSIBLE_SOURCE" in
   pipx)
-    if ! command -v pipx >/dev/null; then
+    if ! command -v pipx >/dev/null && [[ "$PLATFORM" == bazzite ]]; then
+      log "Installing pipx with Homebrew"
+      brew install pipx
+    elif ! command -v pipx >/dev/null; then
       log "Installing pipx"
       sudo apt-get update
       sudo apt-get install -y pipx python3-venv
@@ -89,7 +114,7 @@ case "$ANSIBLE_SOURCE" in
       pipx install ansible-core
     fi
     pipx ensurepath >/dev/null 2>&1 || true
-    if dpkg -s ansible-core >/dev/null 2>&1; then
+    if [[ "$PLATFORM" == ubuntu ]] && dpkg -s ansible-core >/dev/null 2>&1; then
       warn "The apt 'ansible-core' package is also installed ($(dpkg-query -W -f='${Version}' ansible-core)).
    ~/.local/bin takes precedence, so the pipx one is what runs. To drop the
    distro copy:  sudo apt-get purge ansible ansible-core"
@@ -109,8 +134,12 @@ command -v ansible-playbook >/dev/null || die "ansible-playbook still not on PAT
 log "Using $(ansible-playbook --version | head -1) from $(command -v ansible-playbook)"
 
 # For the system python, which Ansible uses on the target even from pipx.
-log "Installing Ansible's runtime helpers"
-sudo apt-get install -y python3-apt python3-psutil dbus
+# Bazzite's image needs nothing extra: its modules drive the rpm-ostree,
+# flatpak and brew commands.
+if [[ "$PLATFORM" == ubuntu ]]; then
+  log "Installing Ansible's runtime helpers"
+  sudo apt-get install -y python3-apt python3-psutil dbus
+fi
 
 log "Installing Ansible collections"
 ansible-galaxy collection install -r "$ANSIBLE_DIR/requirements.yml"

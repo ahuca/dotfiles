@@ -4,6 +4,8 @@
 #   ansible-playbook playbooks/tpm-unlock.yml -K -e tpm_rebind=true
 #   ansible-playbook playbooks/tpm-unlock.yml -K -e tpm_pcrs=0,7
 #   ansible-playbook playbooks/tpm-unlock.yml -K -e tpm_device=/dev/nvme0n1p3
+- ansible.builtin.import_playbook: platform.yml
+
 - name: Bind LUKS to the TPM2
   hosts: workstation
   gather_facts: true
@@ -15,6 +17,14 @@
         press Enter to skip if a binding already exists)
       private: true
       default: ""
+
+  pre_tasks:
+    - name: Check this is Ubuntu
+      ansible.builtin.assert:
+        that: platform == 'ubuntu'
+        fail_msg: "This playbook is Ubuntu-only (apt, initramfs-tools, shim-signed)."
+        quiet: true
+      tags: [always]
 
   roles:
     - role: tpm_unlock

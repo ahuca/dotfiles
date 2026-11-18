@@ -1,4 +1,6 @@
 ---
+- ansible.builtin.import_playbook: platform.yml
+
 - name: Provision this workstation
   hosts: workstation
   gather_facts: true
@@ -8,14 +10,20 @@
       tags: [always]
     - role: apt_repos
       tags: [repos]
+      when: platform == 'ubuntu'
     - role: packages
       tags: [packages]
     - role: docker
       tags: [docker]
+      when: platform == 'ubuntu'
+    # GNOME only; Bazzite runs KDE Plasma.
     - role: desktop
       tags: [desktop]
+      when: platform == 'ubuntu'
+    # Hardware of one Ubuntu laptop; skips itself elsewhere anyway.
     - role: touchpad
       tags: [touchpad]
+      when: platform == 'ubuntu'
     - role: shell
       tags: [shell]
     - role: homebrew

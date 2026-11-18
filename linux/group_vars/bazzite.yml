@@ -1,0 +1,54 @@
+---
+# Bazzite (KDE Plasma), on top of all.yml. Only the tools wanted on every
+# machine; the Ubuntu-only roles (apt repos, Docker, GNOME desktop, touchpad,
+# VMware, TPM unlock) don't run here.
+#
+# Where things come from, in order of preference: Flatpak for apps, Homebrew
+# for CLI tools, rpm-ostree layering only for what must sit on the host.
+
+# ── homebrew ────────────────────────────────────────────────────────
+# Replaces all.yml's list. Bazzite ships Homebrew in the same prefix.
+homebrew_packages:
+  # Applies the dotfiles in home/ (bootstrap.sh runs it after the playbook).
+  - chezmoi
+  # terminal
+  - neovim
+  - fzf
+  - fd
+  - lazygit
+  - git-delta
+  - git-lfs # its filter config comes from chezmoi's ~/.gitconfig
+  - glow
+  - tealdeer # the tldr command
+  - sevenzip # 7zz
+  - topgrade
+  # coding
+  - gh
+  - opencode
+  - d2
+  # sync-secrets (chezmoi) fetches API keys with it.
+  - rbw
+
+# Universal Blue's tap of Linux casks; VS Code doesn't work well as a Flatpak.
+homebrew_taps:
+  - ublue-os/tap
+homebrew_casks:
+  - visual-studio-code-linux
+
+# ── flatpak ─────────────────────────────────────────────────────────
+flatpak_packages:
+  # Its SSH agent listens in the app's data dir; chezmoi finds it there.
+  - com.bitwarden.desktop
+
+# ── rpm-ostree ──────────────────────────────────────────────────────
+# copr: owner/project to enable first.
+rpm_ostree_packages:
+  # The login shell must not live in Homebrew (see the shell role).
+  - name: zsh
+  # Not on Flathub or Linux Homebrew; this is Ghostty's documented route.
+  - name: ghostty
+    copr: scottames/ghostty
+
+# ── Claude Code ─────────────────────────────────────────────────────
+# The native installer (~/.local/bin, updates itself), not a package.
+claude_code_enabled: true

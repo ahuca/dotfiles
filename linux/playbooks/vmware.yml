@@ -7,6 +7,8 @@
 #   ansible-playbook playbooks/vmware.yml --tags keyboard
 #   ansible-playbook playbooks/vmware.yml --tags scaling
 #   ansible-playbook playbooks/vmware.yml --tags clipboard
+- ansible.builtin.import_playbook: platform.yml
+
 - name: Set up VMware Workstation
   hosts: workstation
   gather_facts: true
@@ -19,6 +21,14 @@
       private: true
       confirm: true
       default: ""
+
+  pre_tasks:
+    - name: Check this is Ubuntu
+      ansible.builtin.assert:
+        that: platform == 'ubuntu'
+        fail_msg: "This playbook is Ubuntu-only (apt, initramfs-tools, shim-signed)."
+        quiet: true
+      tags: [always]
 
   roles:
     - role: vmware

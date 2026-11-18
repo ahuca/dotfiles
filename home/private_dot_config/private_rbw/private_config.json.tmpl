@@ -1,3 +1,5 @@
+{{- $pinentry := .vault.rbw.pinentry | last -}}
+{{- range .vault.rbw.pinentry | reverse }}{{ if lookPath . }}{{ $pinentry = . }}{{ end }}{{ end -}}
 {{- dict
       "email" .vault.email
       "sso_id" nil
@@ -7,6 +9,6 @@
       "notifications_url" nil
       "lock_timeout" .vault.rbw.lockTimeout
       "sync_interval" .vault.rbw.syncInterval
-      "pinentry" .vault.rbw.pinentry
+      "pinentry" $pinentry
       "client_cert_path" nil
     | toPrettyJson "  " }}

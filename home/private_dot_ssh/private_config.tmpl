@@ -12,7 +12,7 @@ Host {{ $p.host }}
     HostName {{ $p.hostname }}
     User git
 {{-     if ne $.chezmoi.os "windows" }}
-    IdentityAgent {{ $.vault.sshAgentSocket }}
+    IdentityAgent {{ includeTemplate "ssh-agent-socket" $ }}
 {{-     end }}
     IdentityFile ~/.ssh/git-profiles/{{ $p.name }}.pub
     IdentitiesOnly yes

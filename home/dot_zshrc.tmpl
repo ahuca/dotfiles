@@ -24,7 +24,7 @@ export PNPM_HOME="$HOME/.local/share/pnpm"
 export PATH="$PNPM_HOME/bin:$PATH"
 
 # Every SSH key lives in Bitwarden's agent.
-export SSH_AUTH_SOCK="{{ .vault.sshAgentSocket | replace "~" "$HOME" }}"
+export SSH_AUTH_SOCK="{{ includeTemplate "ssh-agent-socket" . | replace "~" "$HOME" }}"
 
 # zsh never reads ~/.profile, which is where Ubuntu puts ~/.local/bin on PATH
 # (pipx's ansible, sync-secrets).

@@ -1,0 +1,42 @@
+---
+# Tells the platforms apart, for every playbook: records `platform` (ubuntu
+# or bazzite) and puts the machine in that group, so group_vars/<platform>.yml
+# applies on top of all.yml. "ubuntu" covers any apt system, as before.
+- name: Identify the platform
+  hosts: workstation
+  gather_facts: false
+  # Also under --tags, which every other task depends on.
+  tags: [always]
+
+  tasks:
+    - name: Read os-release
+      ansible.builtin.slurp:
+        src: /etc/os-release
+      register: _os_release
+
+    - name: Look for an rpm-ostree (atomic) system
+      ansible.builtin.stat:
+        path: /run/ostree-booted
+      register: _ostree_booted
+
+    - name: Record the platform
+      ansible.builtin.set_fact:
+        platform: >-
+          {{ 'bazzite' if _os_id == 'bazzite' and _ostree_booted.stat.exists
+             else 'ubuntu' if ([_os_id] + _os_like) | intersect(['ubuntu', 'debian'])
+             else 'unsupported' }}
+      vars:
+        _os: "{{ _os_release.content | b64decode }}"
+        _os_id: "{{ (_os | regex_search('^ID=(.*)$', '\\1', multiline=True) or ['']) | first | trim('\"') }}"
+        _os_like: "{{ ((_os | regex_search('^ID_LIKE=(.*)$', '\\1', multiline=True) or ['']) | first | trim('\"')).split() }}"
+
+    - name: Stop on any other system
+      ansible.builtin.assert:
+        that: platform != 'unsupported'
+        fail_msg: "These playbooks target Ubuntu (apt) and Bazzite; see /etc/os-release."
+        quiet: true
+
+    - name: Group the machine by platform
+      ansible.builtin.group_by:
+        key: "{{ platform }}"
+      changed_when: false

@@ -1,9 +1,10 @@
-# dotfiles — Ubuntu and Windows workstations
+# dotfiles — Ubuntu, Bazzite and Windows workstations
 
 Three layers, one repo:
 
 - **`linux/`** is an Ansible project that provisions this Ubuntu workstation against itself: apt repos
-  and packages, GNOME, udev, systemd, TPM, VMware — anything machine-wide.
+  and packages, GNOME, udev, systemd, TPM, VMware — anything machine-wide. It
+  also provisions a [Bazzite](#bazzite) machine, with a smaller set of tools.
   Nothing here talks to a remote host: the inventory is `localhost` with
   `ansible_connection=local`.
 - **`windows/`** is the Windows counterpart, a WinGet configuration: packages and
@@ -25,7 +26,9 @@ linux/                the Ansible project
   site.yml            default entry point -> playbooks/workstation.yml
   inventory.ini       localhost, local connection
   group_vars/all.yml  ALL the configuration (package lists, repos, hotkeys, ...)
+  group_vars/bazzite.yml  what Bazzite gets instead (overrides all.yml there)
   playbooks/
+    platform.yml      tells Ubuntu from Bazzite; every playbook imports it
     workstation.yml   everyday setup: repos, packages, desktop, shell, node, brew
     tpm-unlock.yml    bind the LUKS root volume to the TPM2 (clevis)
     vmware.yml        VMware Workstation modules, MOK signing, temp dir, perms, hotkeys, scaling, clipboard
@@ -182,6 +185,57 @@ kernel maps the button itself.
   your keys.
 - Then `chezmoi apply` once more, so git finds the signing keys (see
   [Git profiles and signing](#git-profiles-and-signing)).
+
+## Bazzite
+
+A personal machine on [Bazzite](https://bazzite.gg/) (KDE Plasma) runs the
+same `bootstrap.sh` and `workstation.yml`, with a smaller set of tools: the
+ones wanted everywhere, not the work or hardware ones. `playbooks/platform.yml`
+recognises Bazzite (`ID=bazzite` in `/etc/os-release` on an rpm-ostree system)
+and puts the machine in the `bazzite` group, so `linux/group_vars/bazzite.yml`
+applies on top of `all.yml`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ahuca/dotfiles/main/bootstrap.sh | bash
+```
+
+Bazzite's image is read-only, so software comes from elsewhere. Preference is
+Flatpak for apps, Homebrew (which Bazzite ships, in the same prefix) for CLI
+tools, and rpm-ostree layering only for what has to sit on the host:
+
+| From | What |
+|------|------|
+| Homebrew | chezmoi, Neovim, fzf, fd, lazygit, delta, Git LFS, glow, tealdeer, 7-Zip (`7zz`), topgrade, gh, opencode, D2, rbw, fnm + pnpm |
+| Homebrew cask, `ublue-os/tap` | VS Code (`visual-studio-code-linux`); it doesn't work well as a Flatpak |
+| Flatpak (Flathub, system) | Bitwarden |
+| rpm-ostree, `--apply-live` | zsh, Ghostty (from the `scottames/ghostty` COPR, Ghostty's documented route for Atomic Fedora) |
+| installer script | uv, Claude Code (native installer into `~/.local/bin`, updates itself) |
+
+Ansible itself comes from pipx, installed with Homebrew. oh-my-zsh and its
+plugins, node and the dotfiles in `home/` are the same as on Ubuntu.
+
+Left out on purpose: the apt repos, Docker (Bazzite ships Podman and
+Distrobox), the GNOME `desktop` role, the touchpad fix, Edge, ONLYOFFICE,
+KeePassXC, CopyQ, KDE Connect's tweaks, PowerShell, rclone, Intune and UniFi.
+`tpm-unlock.yml` and `vmware.yml` refuse to run; Bazzite has its own `ujust`
+recipe for TPM unlock. Add a tool by listing it in `group_vars/bazzite.yml`.
+
+Notes:
+
+- **zsh is layered, not from Homebrew**, because it becomes the login shell:
+  a broken brew would otherwise lock you out of the desktop. If a rollback
+  takes the image back past the layering, `/usr/bin/zsh` is gone; switch back
+  with `sudo usermod --shell /bin/bash $USER` and re-run `--tags zsh`. A
+  failed layering (`rpm-ostree status` shows what's there) doesn't stop the
+  run; the shell role then leaves the login shell alone.
+- **Bitwarden's SSH agent** listens in the Flatpak's data dir,
+  `~/.var/app/com.bitwarden.desktop/data/.bitwarden-ssh-agent.sock`, and
+  chezmoi points `SSH_AUTH_SOCK` and the git profiles there whenever the
+  Flatpak is installed. rbw uses the first installed of `pinentry-gnome3`,
+  `pinentry-qt` and `pinentry-curses` (`vault.rbw.pinentry`).
+- If the VS Code cask is refused because the tap isn't trusted (seen on the
+  Universal Blue forum), `brew trust ublue-os/tap` is the suggested fix; then
+  re-run `--tags brew`.
 
 ## Dotfiles: `home/` via chezmoi
 

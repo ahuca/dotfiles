@@ -1,4 +1,6 @@
 ---
+# Bazzite ships Homebrew in the same prefix; every step below then finds it
+# already in place.
 - name: Install Homebrew (Linuxbrew) and its packages
   when: homebrew_enabled | bool
   block:
@@ -7,6 +9,7 @@
         name: [build-essential, procps, file, git]
         state: present
       become: true
+      when: platform == 'ubuntu'
 
     # The official installer calls sudo itself, which fails without a tty.
     - name: Create the Homebrew prefix owned by {{ target_user }}
@@ -52,8 +55,30 @@
         block: |
           eval "$({{ homebrew_prefix }}/bin/brew shellenv)"
 
+    - name: Add Homebrew taps
+      community.general.homebrew_tap:
+        name: "{{ homebrew_taps }}"
+        state: present
+        path: "{{ homebrew_prefix }}/bin"
+      when: homebrew_taps | length > 0
+
     - name: Install Homebrew packages
       community.general.homebrew:
         name: "{{ homebrew_packages }}"
         state: present
         path: "{{ homebrew_prefix }}/bin"
+
+    # Linux casks are few, and come from taps such as ublue-os/tap.
+    - name: Install Homebrew casks
+      community.general.homebrew_cask:
+        name: "{{ homebrew_casks }}"
+        state: present
+        path: "{{ homebrew_prefix }}/bin"
+      when: homebrew_casks | length > 0
+
+    - name: Download the tldr pages
+      ansible.builtin.command:
+        cmd: "{{ homebrew_prefix }}/bin/tldr --update"
+        creates: "{{ target_home }}/.cache/tealdeer/tldr-pages"
+      when: "'tealdeer' in homebrew_packages"
+      tags: [tldr]

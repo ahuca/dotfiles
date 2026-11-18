@@ -22,9 +22,14 @@ Before committing, grep the diff for anything that looks personal.
 
 - Machine-wide on Ubuntu (packages, repos, GNOME, udev, systemd, root
   files): an Ansible role in `linux/`.
+- Machine-wide on Bazzite: the same roles, branching on the `platform` fact
+  (`playbooks/platform.yml`); what Bazzite installs is listed in
+  `linux/group_vars/bazzite.yml`. Bazzite only gets the tools wanted on every
+  machine — ask before adding one there. Prefer Flatpak, then Homebrew, then
+  rpm-ostree layering.
 - Machine-wide on Windows (packages, services, elevated settings):
   `windows/configuration.winget`.
-- Dotfiles under `$HOME`, on either OS: chezmoi's source state in `home/`,
+- Dotfiles under `$HOME`, on any OS: chezmoi's source state in `home/`,
   branching on `.chezmoi.os` where the platforms differ. Per-machine values
   are prompted once in `home/.chezmoi.toml.tmpl`, never committed. (A role
   may still drop a `$HOME` file that only serves its own feature, like the

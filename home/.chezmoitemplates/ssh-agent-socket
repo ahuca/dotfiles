@@ -1,0 +1,5 @@
+{{- /* The Bitwarden SSH agent's socket (Linux), with a leading ~: the
+       Flatpak's when that is installed (Bazzite), else the snap's (Ubuntu). */ -}}
+{{- $flatpak := or (stat "/var/lib/flatpak/app/com.bitwarden.desktop")
+                   (stat (joinPath .chezmoi.homeDir ".local/share/flatpak/app/com.bitwarden.desktop")) -}}
+{{- if $flatpak }}{{ .vault.sshAgentSockets.flatpak }}{{ else }}{{ .vault.sshAgentSockets.snap }}{{ end -}}

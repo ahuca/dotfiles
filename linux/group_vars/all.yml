@@ -1,4 +1,6 @@
 ---
+# Every platform's defaults; group_vars/bazzite.yml overrides them there.
+# playbooks/platform.yml puts the machine in the ubuntu or bazzite group.
 target_user: "{{ lookup('env', 'USER') }}"
 target_home: "{{ lookup('env', 'HOME') }}"
 
@@ -211,6 +213,8 @@ homebrew_packages:
   # Ubuntu's rclone (1.60) is too old for the onedrive backend; topgrade
   # keeps the brew formula current.
   - rclone
+homebrew_taps: []
+homebrew_casks: []
 
 # ── TPM / LUKS auto-unlock (playbooks/tpm-unlock.yml) ───────────────
 tpm_pcrs: "7"          # e.g. "0,7"

@@ -10,7 +10,7 @@
 # skipping it is the only way to stop ssh offering the host's key first: ssh
 # offers agent keys in the agent's order, not the -i order.
 [core]
-	sshCommand = {{ includeTemplate "ssh-command" $ }} -F none -o IdentitiesOnly=yes{{ if ne $.chezmoi.os "windows" }} -o IdentityAgent={{ $.vault.sshAgentSocket }}{{ end }} -i '{{ joinPath $.chezmoi.homeDir ".ssh/git-profiles" (print $p.name ".pub") | replace "\\" "/" }}'
+	sshCommand = {{ includeTemplate "ssh-command" $ }} -F none -o IdentitiesOnly=yes{{ if ne $.chezmoi.os "windows" }} -o IdentityAgent={{ includeTemplate "ssh-agent-socket" $ }}{{ end }} -i '{{ joinPath $.chezmoi.homeDir ".ssh/git-profiles" (print $p.name ".pub") | replace "\\" "/" }}'
 {{-     end }}
 {{    end -}}
 {{- end -}}
