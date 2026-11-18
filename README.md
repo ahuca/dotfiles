@@ -112,13 +112,13 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 | Role       | What it does                                                                 |
 |------------|------------------------------------------------------------------------------|
 | `common`   | apt keyring dir, base tooling (curl, wget, git, gpg, …)                       |
-| `apt_repos`| signing keys + deb822 `.sources` for Charm, VS Code, GitHub CLI, Claude Code, Edge, Microsoft prod (Intune), ONLYOFFICE |
-| `packages` | apt packages (incl. KDE Connect + its ufw ports + XWayland start for clipboard sync, lazygit, delta, Git LFS, tldr via tealdeer + its pages, rbw + pinentry for `sync-secrets`, ONLYOFFICE Desktop Editors), snaps (Bitwarden, PowerShell), D2, topgrade, UniFi Identity Desktop |
+| `apt_repos`| signing keys + deb822 `.sources` for Charm, VS Code, GitHub CLI, Claude Code, Edge, ONLYOFFICE; Microsoft prod (Intune) on [work machines](#work-tools-opt-in) |
+| `packages` | apt packages (incl. KDE Connect + its ufw ports + XWayland start for clipboard sync, lazygit, delta, Git LFS, tldr via tealdeer + its pages, rbw + pinentry for `sync-secrets`, ONLYOFFICE Desktop Editors), the Bitwarden snap, D2, topgrade; on [work machines](#work-tools-opt-in) Intune Portal, the PowerShell snap and UniFi Identity Desktop |
 | `docker`   | Docker's apt repo + Docker Engine, Buildx, Compose; you in the `docker` group |
 | `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); Ctrl+Alt+Space to switch the keyboard layout (`wm_switch_input_source_bindings`); opt-in `< > \|` on AltGr+`,` `.` `-` (`xkb_lsgt_on_altgr`); GNOME Shell extensions from extensions.gnome.org (`gnome_extensions`: Tiling Shell, replacing Ubuntu's Tiling Assistant; loads at next login) and their settings (`gnome_extension_settings`: Tiling Shell layouts synced across workspaces, so they persist per monitor) |
 | `touchpad` | ASUS ProArt Studiobook touchpad: a root service that forwards the physical middle button the kernel drops (only where that touchpad is present; see below) |
 | `shell`    | oh-my-zsh and the plugins it doesn't bundle (fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting); zsh as the login shell. `~/.zshrc` itself comes from chezmoi |
-| `homebrew` | Linuxbrew + `opencode` (which pulls in ripgrep) + `chezmoi`                   |
+| `homebrew` | Linuxbrew + `opencode` (which pulls in ripgrep) + `chezmoi`; rclone on [work machines](#work-tools-opt-in) |
 | `nodejs`   | fnm + pnpm from Homebrew, latest LTS node as fnm's default; removes a leftover nvm (`~/.nvm`, its `~/.bashrc` lines, corepack's cache) |
 
 #### Three notes on how packages are sourced
@@ -150,6 +150,23 @@ install, which needs no privileges of its own.
 
 Everything configurable lives in `linux/group_vars/all.yml` — add a package
 to `apt_packages`, a repo to `apt_repositories`, and re-run.
+
+### Work tools (opt-in)
+
+Intune Portal (with Microsoft's prod repo), PowerShell, rclone and UniFi
+Identity Desktop are for work machines only. They install when `work_tools`
+is true, which is false in `group_vars/all.yml`. `bootstrap.sh` asks
+"Work machine?" on a machine's first run and keeps the answer in
+`linux/host_vars/localhost.yml`, which git ignores and Ansible reads on every
+run. Delete that file to be asked again, or override it for one run:
+
+```bash
+ansible-playbook site.yml -K -e work_tools=true
+```
+
+A work tool added later goes in `work_apt_packages`, `work_snap_packages` or
+`work_homebrew_packages` (or a repo with `work: true`). Switching
+`work_tools` off uninstalls nothing.
 
 To upgrade installed packages rather than just ensure they are present:
 
@@ -216,7 +233,7 @@ plugins, node and the dotfiles in `home/` are the same as on Ubuntu.
 
 Left out on purpose: the apt repos, Docker (Bazzite ships Podman and
 Distrobox), the GNOME `desktop` role, the touchpad fix, Edge, ONLYOFFICE,
-KeePassXC, CopyQ, KDE Connect's tweaks, PowerShell, rclone, Intune and UniFi.
+KeePassXC, CopyQ, KDE Connect's tweaks, and the [work tools](#work-tools-opt-in).
 `tpm-unlock.yml` and `vmware.yml` refuse to run; Bazzite has its own `ujust`
 recipe for TPM unlock. Add a tool by listing it in `group_vars/bazzite.yml`.
 

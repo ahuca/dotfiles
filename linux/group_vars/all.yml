@@ -7,6 +7,12 @@ target_home: "{{ lookup('env', 'HOME') }}"
 # present | latest
 package_state: present
 
+# Work tools: Intune Portal (and Microsoft's prod repo), PowerShell, rclone,
+# UniFi Identity Desktop. Opt-in per machine: bootstrap.sh asks once and
+# keeps the answer in linux/host_vars/localhost.yml (git-ignored), or pass
+# -e work_tools=true. Turning it off later uninstalls nothing.
+work_tools: false
+
 # ── apt repositories ────────────────────────────────────────────────
 # managed_by_package: the package writes its own .sources on upgrade, so ours
 # is only used for the first install and skipped once it is present.
@@ -54,8 +60,10 @@ apt_repositories:
     architectures: [amd64]
     managed_by_package: microsoft-edge-stable
 
-  # For Intune Portal. Signed with the 2025 key, not microsoft.asc.
+  # For Intune Portal, so work machines only. Signed with the 2025 key, not
+  # microsoft.asc.
   - name: microsoft-prod
+    work: true
     key_url: https://packages.microsoft.com/keys/microsoft-2025.asc
     keyring: microsoft-2025.asc
     uris: "https://packages.microsoft.com/ubuntu/{{ ansible_facts.distribution_version }}/prod"
@@ -113,8 +121,9 @@ apt_packages:
   - code
   - gh
   - microsoft-edge-stable
-  - intune-portal
   - onlyoffice-desktopeditors
+work_apt_packages:
+  - intune-portal
 
 # Upgraded on every run, regardless of package_state.
 apt_packages_latest:
@@ -122,6 +131,7 @@ apt_packages_latest:
 
 snap_packages:
   - name: bitwarden
+work_snap_packages:
   # The prod apt repo only carries powershell-preview.
   - name: powershell
     classic: true
@@ -138,7 +148,7 @@ topgrade_enabled: true
 topgrade_repo: topgrade-rs/topgrade
 
 # Fallback if this stops resolving: https://ui.com/download/app/identity-desktop
-unifi_identity_enabled: true
+unifi_identity_enabled: "{{ work_tools }}"
 unifi_identity_url: "https://fw-update.ui.com/api/v2/firmware-latest/data?filter=eq~~product~~unifi-endpoint-desktop-app-deb&filter=eq~~platform~~linux&filter=eq~~channel~~release"
 
 # ── desktop (GNOME) ─────────────────────────────────────────────────
@@ -210,6 +220,7 @@ homebrew_packages:
   - opencode
   # Applies the dotfiles in home/ (bootstrap.sh runs it after the playbook).
   - chezmoi
+work_homebrew_packages:
   # Ubuntu's rclone (1.60) is too old for the onedrive backend; topgrade
   # keeps the brew formula current.
   - rclone

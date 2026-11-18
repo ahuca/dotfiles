@@ -3,16 +3,21 @@
   ansible.builtin.package_facts:
     manager: apt
 
+# Repos marked `work: true` only on machines with work_tools.
 - name: Work out which repositories we still need to manage
   ansible.builtin.set_fact:
     managed_repositories: >-
-      {{ apt_repositories
+      {{ _repos
          | rejectattr('managed_by_package', 'defined')
          | list
-         + apt_repositories
+         + _repos
          | selectattr('managed_by_package', 'defined')
          | rejectattr('managed_by_package', 'in', ansible_facts.packages)
          | list }}
+  vars:
+    _repos: >-
+      {{ apt_repositories if work_tools | bool
+         else apt_repositories | rejectattr('work', 'true') | list }}
 
 - name: Report repositories left to the vendor's own postinst
   ansible.builtin.debug:

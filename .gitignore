@@ -8,3 +8,6 @@ __pycache__/
 
 # nohup output from local runs
 nohup.out
+
+# Per-machine Ansible choices (work_tools), written by bootstrap.sh
+linux/host_vars/

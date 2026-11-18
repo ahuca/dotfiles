@@ -80,6 +80,24 @@ if [[ "$SUDO_NOPASSWD" -eq 0 ]]; then
   [[ -n "$SUDO_PASS" ]] || die "sudo authentication failed."
 fi
 
+# --- per-machine choices ----------------------------------------------
+# Asked once and kept in linux/host_vars/localhost.yml (git-ignored), which
+# Ansible reads on every run; delete it to be asked again. Without a terminal
+# nothing is written and work_tools stays off. Bazzite gets no work tools.
+HOST_VARS="$ANSIBLE_DIR/host_vars/localhost.yml"
+if [[ "$PLATFORM" == ubuntu && ! -f "$HOST_VARS" && -t 0 ]]; then
+  read -rp "Work machine? Adds Intune Portal, PowerShell, rclone and UniFi Identity [y/N]: " answer
+  work_tools=false
+  [[ "$answer" =~ ^[Yy] ]] && work_tools=true
+  mkdir -p "$(dirname "$HOST_VARS")"
+  cat >"$HOST_VARS" <<VARS
+# This machine's choices, asked once by bootstrap.sh. Not in git; delete
+# this file to be asked again. See work_tools in group_vars/all.yml.
+work_tools: $work_tools
+VARS
+  log "Saved work_tools: $work_tools to $HOST_VARS"
+fi
+
 PLAYBOOK="site.yml"
 if [[ "${1:-}" == "--" ]]; then
   shift

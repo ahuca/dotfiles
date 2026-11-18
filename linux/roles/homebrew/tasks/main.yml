@@ -64,7 +64,7 @@
 
     - name: Install Homebrew packages
       community.general.homebrew:
-        name: "{{ homebrew_packages }}"
+        name: "{{ homebrew_packages + (work_homebrew_packages if work_tools | bool else []) }}"
         state: present
         path: "{{ homebrew_prefix }}/bin"
 
