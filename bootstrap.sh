@@ -60,8 +60,10 @@ ANSIBLE_DIR="$REPO_DIR/linux"
 ANSIBLE_SOURCE="${ANSIBLE_SOURCE:-pipx}"
 
 # -k: a cached sudo ticket would pass -n, but Ansible's become cannot use it.
+# Without SSH_AUTH_SOCK: the sudo_agent role lets sudo pass through the SSH
+# agent, which Ansible's become doesn't use either (ansible.cfg's become_exe).
 SUDO_NOPASSWD=0
-sudo -k -n true 2>/dev/null && SUDO_NOPASSWD=1
+env -u SSH_AUTH_SOCK sudo -k -n true 2>/dev/null && SUDO_NOPASSWD=1
 
 # Ask once: validating warms the ticket for this script's own sudo calls, and
 # the same password goes to Ansible via a pipe (never argv, env or disk).
@@ -73,7 +75,7 @@ if [[ "$SUDO_NOPASSWD" -eq 0 ]]; then
   sudo -k
   for _ in 1 2 3; do
     read -rsp "sudo password: " SUDO_PASS; echo
-    printf '%s\n' "$SUDO_PASS" | sudo -S -p '' -v 2>/dev/null && break
+    printf '%s\n' "$SUDO_PASS" | env -u SSH_AUTH_SOCK sudo -S -p '' -v 2>/dev/null && break
     SUDO_PASS=""
     warn "Sorry, try again."
   done

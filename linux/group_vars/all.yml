@@ -191,6 +191,14 @@ gnome_extension_settings:
 # Skips itself on machines without such a touchpad.
 touchpad_middle_button_enabled: true
 
+# ── sudo_agent ──────────────────────────────────────────────────────
+# sudo tries an SSH agent key (Bitwarden approves) before the password: the
+# one whose Bitwarden item is named sudo_agent_key_comment. Skips itself until
+# the agent lists it; false takes it out again.
+sudo_agent_auth: true
+sudo_agent_key_comment: sudo
+sudo_agent_keys_file: /etc/security/sudo_authorized_keys
+
 # ── shell ───────────────────────────────────────────────────────────
 # ~/.zshrc, which picks the plugins, comes from chezmoi (home/dot_zshrc.tmpl).
 oh_my_zsh_enabled: true

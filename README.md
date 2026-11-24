@@ -92,6 +92,7 @@ ansible-playbook site.yml -K --tags kdeconnect  # just the KDE Connect ufw rule 
 ansible-playbook site.yml -K --tags topgrade  # just topgrade (.deb from its GitHub release)
 ansible-playbook site.yml --tags extensions  # just the GNOME Shell extensions (Tiling Shell)
 ansible-playbook site.yml -K --tags touchpad  # just the touchpad middle-button fix
+ansible-playbook site.yml -K --tags sudo_agent  # just sudo via the Bitwarden SSH agent
 ansible-playbook site.yml --tags zsh_plugins  # just the oh-my-zsh plugins
 ansible-playbook site.yml -K --tags docker   # just Docker Engine (and its repo)
 ansible-playbook site.yml -K --skip-tags docker  # everything except Docker
@@ -117,6 +118,7 @@ Preference throughout: **package managers only** — apt repo > snap > apt-insta
 | `docker`   | Docker's apt repo + Docker Engine, Buildx, Compose; you in the `docker` group |
 | `desktop`  | CopyQ GNOME hotkey (Wayland-safe) + autostart; Super+Ctrl+T for "Always on top" (`wm_toggle_above_bindings`); Ctrl+Alt+Space to switch the keyboard layout (`wm_switch_input_source_bindings`); opt-in `< > \|` on AltGr+`,` `.` `-` (`xkb_lsgt_on_altgr`); GNOME Shell extensions from extensions.gnome.org (`gnome_extensions`: Tiling Shell, replacing Ubuntu's Tiling Assistant; loads at next login) and their settings (`gnome_extension_settings`: Tiling Shell layouts synced across workspaces, so they persist per monitor) |
 | `touchpad` | ASUS ProArt Studiobook touchpad: a root service that forwards the physical middle button the kernel drops (only where that touchpad is present; see below) |
+| `sudo_agent` | sudo authenticates with your Bitwarden SSH agent keys (Bitwarden asks to approve) before falling back to the password; see [sudo via the SSH agent](#sudo-via-the-ssh-agent) |
 | `shell`    | oh-my-zsh and the plugins it doesn't bundle (fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting); zsh as the login shell. `~/.zshrc` itself comes from chezmoi |
 | `homebrew` | Linuxbrew + `opencode` (which pulls in ripgrep) + `chezmoi`; rclone on [work machines](#work-tools-opt-in) |
 | `nodejs`   | fnm + pnpm from Homebrew, latest LTS node as fnm's default; removes a leftover nvm (`~/.nvm`, its `~/.bashrc` lines, corepack's cache) |
@@ -193,6 +195,30 @@ collection's buttons mapped to `Sync.Report`. The `touchpad` role installs
 `touchpad-middle-button@hidrawN.service`, started by a udev rule, which reads
 the button from hidraw and presses it on a virtual mouse. Remove it once the
 kernel maps the button itself.
+
+### sudo via the SSH agent
+
+The `sudo_agent` role adds `pam_ssh_agent_auth` to `/etc/pam.d/sudo` and
+`sudo-i` only: sudo asks the agent to sign a challenge, Bitwarden asks you to
+approve, and you get the password prompt only if that fails (agent off, vault
+locked, approval declined). The login screen, polkit and sshd still take the
+password.
+
+It uses one dedicated key: create an SSH key item in Bitwarden named `sudo`
+(`sudo_agent_key_comment`), so the approval dialog reads "sudo is requesting
+access to sudo" — deny anything else. The role copies that key from
+`ssh-add -L` to root-owned `/etc/security/sudo_authorized_keys`; re-run
+`--tags sudo_agent` after replacing it. Until the agent lists it the role
+skips itself, and with the vault unlocked but no such key it takes the PAM
+lines out again.
+
+- In Bitwarden's settings, have the SSH agent ask for authorization **every
+  time**. "Remember until locked" would let any process running as you sudo
+  silently after the first approval.
+- Ansible's become (`become_exe` in `ansible.cfg`) and `bootstrap.sh` hide the
+  agent from sudo, so playbooks still use the `-K` password instead of asking
+  Bitwarden once per task.
+- To take it out: `ansible-playbook site.yml -K --tags sudo_agent -e sudo_agent_auth=false`.
 
 ### After the run
 

@@ -24,6 +24,10 @@
     - role: touchpad
       tags: [touchpad]
       when: platform == 'ubuntu'
+    # Skips itself until the Bitwarden SSH agent lists a key.
+    - role: sudo_agent
+      tags: [sudo_agent]
+      when: platform == 'ubuntu'
     - role: shell
       tags: [shell]
     - role: homebrew

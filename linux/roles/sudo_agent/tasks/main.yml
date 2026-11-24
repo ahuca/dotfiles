@@ -1,0 +1,104 @@
+---
+# sudo authenticates with a key in the Bitwarden SSH agent: pam_ssh_agent_auth
+# has the agent sign a challenge, Bitwarden asks you to approve, and the
+# password prompt only follows if that fails (agent off, vault locked, key not
+# listed, approval declined). Only sudo's own PAM files get the line, so the
+# login screen, polkit and sshd keep asking for the password.
+#
+# Only the agent keys whose comment (the Bitwarden item's name) is
+# sudo_agent_key_comment are allowed, kept root-owned in sudo_agent_keys_file,
+# so the approval dialog names a key meant for nothing else. With no such key
+# in an unlocked agent the role takes the PAM lines out; while the agent is
+# locked or off a re-run leaves things as they are. Set sudo_agent_auth: false
+# to take it all out.
+#
+# sudo-rs keeps the caller's SSH_AUTH_SOCK while PAM runs, which the module
+# needs. Untested with sudo.ws (Ubuntu's alternative), which may also need
+# `Defaults env_keep += SSH_AUTH_SOCK`.
+#
+# Ansible's become (ansible.cfg's become_exe) and bootstrap.sh hide the agent
+# from sudo, or every become task would ask Bitwarden for approval.
+- name: Read the keys in the SSH agent
+  ansible.builtin.command: ssh-add -L
+  register: _sa_agent
+  changed_when: false
+  failed_when: false
+  when: sudo_agent_auth | bool
+
+- name: Look for the allowed keys from an earlier run
+  ansible.builtin.stat:
+    path: "{{ sudo_agent_keys_file }}"
+  register: _sa_keys_file
+
+# rc 0: the agent is up and lists keys. Anything else: off, locked or empty,
+# so it says nothing about which keys exist.
+- name: Pick the sudo key
+  ansible.builtin.set_fact:
+    _sa_unlocked: "{{ (_sa_agent.rc | default(1)) == 0 }}"
+    _sa_keys: >-
+      {{ (_sa_agent.stdout_lines | default([]))
+         | select('match', '^[^ ]+ [^ ]+ ' ~ (sudo_agent_key_comment | regex_escape) ~ '$')
+         | list }}
+
+- name: Let sudo authenticate with the SSH agent
+  when:
+    - sudo_agent_auth | bool
+    - _sa_keys | length > 0 or (not _sa_unlocked and _sa_keys_file.stat.exists)
+  become: true
+  block:
+    # Before PAM names it: a module PAM can't load fails the whole stack.
+    - name: Install pam_ssh_agent_auth
+      ansible.builtin.apt:
+        name: libpam-ssh-agent-auth
+        state: present
+
+    - name: Allow the sudo key
+      ansible.builtin.copy:
+        dest: "{{ sudo_agent_keys_file }}"
+        content: "{{ _sa_keys | join('\n') }}\n"
+        owner: root
+        group: root
+        mode: "0644"
+      when: _sa_keys | length > 0
+
+    - name: Try the agent before the password in sudo's PAM files
+      ansible.builtin.blockinfile:
+        path: "/etc/pam.d/{{ item }}"
+        marker: "# {mark} ANSIBLE MANAGED: sudo_agent"
+        insertbefore: '^@include common-auth'
+        block: >-
+          auth sufficient pam_ssh_agent_auth.so
+          file={{ sudo_agent_keys_file }}
+      loop: [sudo, sudo-i]
+
+- name: Take agent authentication out of sudo
+  when: >-
+    not (sudo_agent_auth | bool)
+    or (_sa_unlocked and _sa_keys | length == 0)
+  become: true
+  block:
+    # PAM lines first, so sudo never names a file that is gone.
+    - name: Remove the PAM lines
+      ansible.builtin.blockinfile:
+        path: "/etc/pam.d/{{ item }}"
+        marker: "# {mark} ANSIBLE MANAGED: sudo_agent"
+        state: absent
+      loop: [sudo, sudo-i]
+
+    - name: Remove the allowed keys
+      ansible.builtin.file:
+        path: "{{ sudo_agent_keys_file }}"
+        state: absent
+
+- name: Note the skipped agent authentication
+  ansible.builtin.debug:
+    msg: >-
+      {{ _sa_unlocked | ternary('The SSH agent has no key named',
+                                'The SSH agent is off or locked, so it lists no key named') }}
+      "{{ sudo_agent_key_comment }}", and sudo keeps asking for the password.
+      Add an SSH key item of that name in Bitwarden (or unlock the vault) and
+      re-run --tags sudo_agent.
+  when:
+    - sudo_agent_auth | bool
+    - _sa_keys | length == 0
+    - _sa_unlocked or not _sa_keys_file.stat.exists
