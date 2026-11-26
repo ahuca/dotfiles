@@ -524,6 +524,7 @@ The old script's subcommands are now tags:
 cd linux
 ansible-playbook playbooks/vmware.yml -K -e vmware_vm_dir=~/vmware/win10  # full setup
 ansible-playbook playbooks/vmware.yml -K --tags modules                   # after a kernel bump
+ansible-playbook playbooks/vmware.yml -K --tags hook                      # build+sign for each new kernel
 ansible-playbook playbooks/vmware.yml -K --tags sign                      # sign already-built modules
 ansible-playbook playbooks/vmware.yml -K --tags mok                       # enroll the signing key
 ansible-playbook playbooks/vmware.yml -K --tags tmp                       # move VMware's scratch off /tmp
@@ -539,6 +540,7 @@ Which tag fixes what:
 | Symptom                                       | Tag       |
 |-----------------------------------------------|-----------|
 | Secure Boot rejects unsigned `vmmon`/`vmnet`  | `modules` |
+| Workstation asks to compile modules after a kernel update | `hook` |
 | `.vmem` "No space left on device" on tmpfs    | `tmp`     |
 | "Insufficient permission" (snapshot/lock)     | `perms`   |
 | Host eats Super / Alt+Tab instead of the guest | `keyboard` |
@@ -566,6 +568,17 @@ without the `copy` line Nautilus needs, several after an
 `x-special/nautilus-clipboard` line. Nautilus refuses both ("Nautilus Clipboard
 must begin with “cut” or “copy”"). The service takes that clipboard over with
 the list fixed. Files alone come through right and are left alone.
+
+The `hook` tag (part of `modules` too) installs `vmware-modules` into
+`/etc/kernel/postinst.d` and `/etc/kernel/header_postinst.d`. VMware ships
+`vmmon`/`vmnet` as source outside DKMS, so nothing builds them for a new
+kernel: after the reboot Workstation asks to compile them, and its unsigned
+build is rejected by Secure Boot. The hook builds them from
+`/usr/lib/vmware/modules/source` and signs them with the MOK key while the
+kernel package installs, unattended upgrades included. It always exits 0, so a
+failed build never blocks the kernel install; Workstation just asks as before,
+and `journalctl -t vmware-modules` says why. To rebuild by hand:
+`sudo env VMWARE_MODULES_FORCE=1 /etc/kernel/postinst.d/vmware-modules "$(uname -r)"`.
 
 Never run `vmware-modconfig --install-all` after signing — it rebuilds the
 modules unsigned and silently undoes the signing.

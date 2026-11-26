@@ -1,6 +1,7 @@
 ---
 #   ansible-playbook playbooks/vmware.yml -K -e vmware_vm_dir=~/vmware/win10
 #   ansible-playbook playbooks/vmware.yml -K --tags modules     # after a kernel bump
+#   ansible-playbook playbooks/vmware.yml -K --tags hook        # build+sign for each new kernel
 #   ansible-playbook playbooks/vmware.yml -K --tags perms -e vmware_vm_dir=~/vmware/other
 #   ansible-playbook playbooks/vmware.yml -K --tags tmp -e vmware_tmp_dir=/data/vmware-tmp
 #   ansible-playbook playbooks/vmware.yml -K --tags status

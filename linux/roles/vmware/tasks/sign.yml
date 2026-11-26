@@ -92,3 +92,21 @@
   ansible.builtin.fail:
     msg: "Modules not loaded. Check: sudo dmesg | grep -iE 'vmmon|vmnet|rejected' | tail"
   when: _lsmod_check.stdout | trim != '2'
+
+# vmware.service fails at boot while the modules are rejected, and loading
+# them later doesn't bring it back: no /dev/vmnet*, so every network adapter
+# fails with "can't open vmnet device". Only restart it when it's down: a
+# restart tears down the virtual networks under running VMs.
+- name: Check VMware's services
+  ansible.builtin.command: systemctl is-active vmware.service
+  register: _vmware_svc
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Start VMware's services (virtual networks)
+  ansible.builtin.systemd_service:
+    name: vmware.service
+    state: restarted
+  become: true
+  when: _vmware_svc.stdout | trim != 'active'

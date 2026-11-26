@@ -1,0 +1,80 @@
+#!/bin/sh
+# Managed by Ansible (roles/vmware).
+#
+# Builds and signs VMware's vmmon/vmnet for a kernel as it installs, so they
+# are ready at the next boot: no "compile modules" prompt from Workstation,
+# and Secure Boot accepts them. The kernel packages run this from
+# /etc/kernel/postinst.d and /etc/kernel/header_postinst.d with the kernel
+# version as $1; whichever runs second finds the work done.
+#
+# By hand (VMWARE_MODULES_FORCE=1 rebuilds modules that are already signed):
+#   sudo /etc/kernel/postinst.d/vmware-modules "$(uname -r)"
+#   sudo env VMWARE_MODULES_FORCE=1 /etc/kernel/postinst.d/vmware-modules "$(uname -r)"
+#
+# Always exits 0: the packages run hooks with run-parts --exit-on-error, so a
+# failure here would leave the kernel half-installed and stall unattended
+# upgrades. At worst Workstation asks to compile the modules, as before.
+
+version="${1:-}"
+mok_dir="{{ vmware_mok_dir }}"
+src=/usr/lib/vmware/modules/source
+build="/lib/modules/$version/build"
+dest="/lib/modules/$version/misc"
+modules="vmmon vmnet"
+
+say() {
+    echo "vmware-modules: $*" >&2
+    logger -t vmware-modules -- "$*" 2>/dev/null || true
+}
+
+[ -n "$version" ] || exit 0
+[ -d "$src" ] || exit 0  # VMware is not installed
+
+if [ ! -f "$build/Makefile" ] || [ ! -x "$build/scripts/sign-file" ]; then
+    # The headers package runs this again once it is configured.
+    say "no headers for $version yet, skipping"
+    exit 0
+fi
+if [ ! -r "$mok_dir/MOK.priv" ] || [ ! -r "$mok_dir/MOK.der" ]; then
+    say "no MOK key in $mok_dir, skipping (ansible-playbook playbooks/vmware.yml -K --tags mok)"
+    exit 0
+fi
+
+if [ "${VMWARE_MODULES_FORCE:-0}" != 1 ]; then
+    done_count=0
+    for m in $modules; do
+        if [ -f "$dest/$m.ko" ] && [ -n "$(modinfo -F signer "$dest/$m.ko" 2>/dev/null)" ]; then
+            done_count=$((done_count + 1))
+        fi
+    done
+    [ "$done_count" -eq 2 ] && exit 0
+fi
+
+tmp=$(mktemp -d) || exit 0
+trap 'rm -rf "$tmp"' EXIT
+
+# Build and sign both before installing either, so a failure leaves
+# /lib/modules as it was.
+for m in $modules; do
+    if ! tar -xf "$src/$m.tar" -C "$tmp" \
+        || ! make -C "$tmp/$m-only" VM_UNAME="$version" -j"$(nproc)" >"$tmp/$m.log" 2>&1; then
+        say "building $m for $version failed; Workstation will ask to compile it after the reboot"
+        tail -n 20 "$tmp/$m.log" >&2 2>/dev/null
+        exit 0
+    fi
+    if ! "$build/scripts/sign-file" sha256 "$mok_dir/MOK.priv" "$mok_dir/MOK.der" "$tmp/$m-only/$m.ko"; then
+        say "signing $m for $version failed"
+        exit 0
+    fi
+done
+
+for m in $modules; do
+    if ! install -D -m 0644 "$tmp/$m-only/$m.ko" "$dest/$m.ko"; then
+        say "installing $m into $dest failed"
+        exit 0
+    fi
+done
+depmod -a "$version" || say "depmod -a $version failed"
+
+say "built and signed vmmon/vmnet for $version"
+exit 0

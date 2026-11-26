@@ -47,6 +47,11 @@
   failed_when: false
   loop: [vmmon, vmnet]
 
+- name: Check the kernel update hook
+  ansible.builtin.stat:
+    path: /etc/kernel/postinst.d/vmware-modules
+  register: _st_hook
+
 - name: Check whether /tmp is RAM-backed
   ansible.builtin.command: findmnt -no FSTYPE /tmp
   register: _st_tmpfs
@@ -125,6 +130,10 @@
         vmnet:         {{ (_st_paths.results[1].rc != 0) | ternary('not built                 -> --tags modules',
                             (_st_signed.results[1].rc == 0) | ternary('built + signed',
                                                                       'built but UNSIGNED        -> --tags sign')) }}
+      - >-
+        Kernel hook:   {{ (_st_hook.stat.exists and _st_hook.stat.executable)
+                          | ternary('installed (new kernels get signed modules)',
+                                    'missing                    -> --tags hook') }}
       - >-
         /tmp:          {{ (_st_tmpfs.stdout | trim == 'tmpfs')
                           | ternary('tmpfs (RAM-backed) — .vmem can overflow it',

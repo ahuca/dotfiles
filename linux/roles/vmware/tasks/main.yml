@@ -1,5 +1,6 @@
 ---
 #   Secure Boot rejects unsigned vmmon/vmnet  -> --tags modules  (build+SIGN+load)
+#   "compile modules" after each kernel update -> --tags hook    (build+sign at install)
 #   .vmem "No space left on device" on tmpfs  -> --tags tmp      (temp off /tmp)
 #   "Insufficient permission" (snapshot/lock) -> --tags perms    (VM dir ownership)
 #   host eats Super/Alt+Tab etc. in the guest -> --tags keyboard (Xwayland grabs)
@@ -26,6 +27,10 @@
 - name: Sign and load the kernel modules
   ansible.builtin.import_tasks: sign.yml
   tags: [modules, sign]
+
+- name: Build and sign the modules for each new kernel
+  ansible.builtin.import_tasks: hook.yml
+  tags: [hook, modules]
 
 - name: Redirect VMware's temp directory
   ansible.builtin.import_tasks: tmp.yml

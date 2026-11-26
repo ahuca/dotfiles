@@ -1,0 +1,26 @@
+---
+# VMware ships vmmon/vmnet as source, outside DKMS, so nothing builds them for
+# a new kernel: after the reboot Workstation asks to compile them, and its
+# build is unsigned, so Secure Boot rejects it. This hook builds and signs
+# them while the kernel package installs (unattended-upgrades included).
+# Both hook dirs get it: the image's runs while the headers may still be
+# unconfigured, the headers' runs once they are; the second finds it done.
+# The headers' dir doesn't exist until something puts a hook in it.
+- name: Create the kernel headers hook directory
+  ansible.builtin.file:
+    path: /etc/kernel/header_postinst.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Install the hook that builds and signs vmmon/vmnet for new kernels
+  ansible.builtin.template:
+    src: vmware-modules.j2
+    dest: "/etc/kernel/{{ item }}/vmware-modules"
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  loop: [postinst.d, header_postinst.d]
